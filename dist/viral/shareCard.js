@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CARD_H = exports.CARD_W = void 0;
 exports.paintShareCard = paintShareCard;
+const copy_1 = require("../content/copy");
 const draw_1 = require("../ui/draw");
 const theme_1 = require("../ui/theme");
 /** 分享图用 5:4，避免会话里把竖图裁坏。文案跟片段是同一下颠勺。 */
@@ -17,7 +18,7 @@ function paintShareCard(ctx, moment) {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.font = (0, theme_1.font)(28, true);
-    ctx.fillText('颠勺大师', 210, 48);
+    ctx.fillText(copy_1.COPY.title, 210, 48);
     ctx.font = (0, theme_1.font)(18, true);
     ctx.fillStyle = theme_1.PALETTE.chiliDeep;
     const dish = moment.dish || '这口锅';

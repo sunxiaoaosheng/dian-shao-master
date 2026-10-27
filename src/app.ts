@@ -87,7 +87,15 @@ class GameApp {
   private loggedLive = false;
   private lastMoment: TossMoment | null = null;
   private lastClipPath: string | null = null;
-  private result: { reason: 'burnt_out' | 'grid_full'; score: number; cardName: string | null } | null = null;
+  private result: {
+    reason: 'burnt_out' | 'grid_full';
+    score: number;
+    cardName: string | null;
+    seconds: number;
+    merges: number;
+    tosses: number;
+    quip: string;
+  } | null = null;
 
   constructor(platform: Platform) {
     this.platform = platform;
@@ -155,6 +163,7 @@ class GameApp {
       showTossButton: this.platform.isDevtools || this.sensorPhase !== 'live',
       sensorLabel: this.sensorLabel(),
       result: this.result,
+      tossWaitMs: Math.max(0, this.tossReadyAt - this.platform.now()),
       shake: this.shake,
       canSave: Boolean(this.lastClipPath),
       qa: this.qaMode
@@ -433,13 +442,19 @@ class GameApp {
       this.meta.runsCompleted += 1;
       this.saveMeta();
     }
+    const quip = reason === 'burnt_out' ? TOAST_LINES[6].text : TOAST_LINES[4].text;
+    const seconds = Math.max(1, Math.round(session.elapsedMs / 1000));
     this.result = {
       reason,
       score: session.score,
       cardName: session.cardsThisRun > 0 && this.recipe ? this.recipe.name : null,
+      seconds,
+      merges: session.merges,
+      tosses: session.tossCount,
+      quip,
     };
     this.screen = 'result';
-    if (reason === 'burnt_out') this.toast(TOAST_LINES[6].text);
+    this.toast(quip, 3400);
     this.sensorGen += 1;
     this.platform.stopSensors();
   }
@@ -471,9 +486,9 @@ class GameApp {
     return COPY.sensorPending;
   }
 
-  private toast(text: string): void {
+  private toast(text: string, lifeMs = 1700): void {
     const now = this.platform.now();
-    this.toasts.push({ text, seed: now % 9973, born: now, until: now + 1700 });
+    this.toasts.push({ text, seed: now % 9973, born: now, until: now + lifeMs });
     if (this.toasts.length > 3) this.toasts.shift();
   }
 

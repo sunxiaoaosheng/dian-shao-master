@@ -1,3 +1,4 @@
+import { COPY } from '../content/copy';
 import type { Ctx } from '../ui/ctx';
 import { drawPolaroid, drawSteam, drawWok, fillTorn, paintPaper } from '../ui/draw';
 import { PALETTE, font } from '../ui/theme';
@@ -13,7 +14,7 @@ export function paintClip(ctx: Ctx, moment: TossMoment): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.font = font(18, false);
-  ctx.fillText('颠勺大师', CLIP_W / 2, 72);
+  ctx.fillText(COPY.title, CLIP_W / 2, 72);
 
   ctx.save();
   ctx.translate(70, 150);

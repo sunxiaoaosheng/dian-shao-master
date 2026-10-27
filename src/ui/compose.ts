@@ -5,7 +5,9 @@ import {
   TIER_NAME,
   cardBody,
   chargesLabel,
+  cooldownLabel,
   playsLeftLabel,
+  roundRecap,
   scoreLabel,
   tossedLabel,
 } from '../content/copy';
@@ -45,7 +47,17 @@ export interface ComposeInput {
   toasts: ToastState[];
   showTossButton: boolean;
   sensorLabel: string;
-  result: { reason: FailReason; score: number; cardName: string | null } | null;
+  result: {
+    reason: FailReason;
+    score: number;
+    cardName: string | null;
+    seconds: number;
+    merges: number;
+    tosses: number;
+    quip: string;
+  } | null;
+  /** 颠勺手感冷却还剩的毫秒。0 表示这下可以颠。 */
+  tossWaitMs: number;
   shake: number;
   canSave: boolean;
   qa: { detected: number; impulse: number; angle: number; unit: string; phase: string } | null;
@@ -185,6 +197,7 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
     charges: session.charges,
     maxCharges: session.maxCharges,
     tossedText: tossedLabel(session.tossCount),
+    cooldownText: input.tossWaitMs > 0 ? cooldownLabel(TIER_NAME[input.tier], input.tossWaitMs) : '',
     showPerfect: session.cardsThisRun > 0,
     showBurnt: session.meter >= 85,
     cells,
@@ -218,14 +231,16 @@ function layoutResult(input: ComposeInput, vm: ViewModel): void {
   const card = result && result.cardName ? cardBody(result.cardName) : COPY.noCardBody;
   const reason = result && result.reason === 'grid_full' ? COPY.fullFailTitle : COPY.burnFailTitle;
   const detail = result && result.reason === 'grid_full' ? COPY.fullFailBody : COPY.burnFailBody;
+  const quip = result && result.quip ? result.quip : '';
   vm.result = {
     title: reason,
-    body: `${detail}${card}`,
+    body: `${detail}${quip}${card}`,
     scoreText: scoreLabel(result ? result.score : 0),
+    recap: result ? roundRecap(result.seconds, result.merges, result.tosses) : '',
   };
   const pad = 18;
   const bw = input.width - pad * 2;
-  let y = input.safeTop + 210;
+  let y = input.safeTop + 236;
   const stack: { id: string; label: string; primary: boolean }[] = [];
   if (input.playsLeft > 0) stack.push({ id: 'again', label: COPY.again, primary: true });
   if (input.canSave) stack.push({ id: 'save', label: COPY.saveClip, primary: false });

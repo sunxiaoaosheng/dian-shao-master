@@ -1,3 +1,4 @@
+import { COPY } from '../content/copy';
 import type { Ctx } from '../ui/ctx';
 import { drawPolaroid, fillTorn, paintPaper } from '../ui/draw';
 import { PALETTE, font } from '../ui/theme';
@@ -17,7 +18,7 @@ export function paintShareCard(ctx: Ctx, moment: TossMoment): void {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.font = font(28, true);
-  ctx.fillText('颠勺大师', 210, 48);
+  ctx.fillText(COPY.title, 210, 48);
   ctx.font = font(18, true);
   ctx.fillStyle = PALETTE.chiliDeep;
   const dish = moment.dish || '这口锅';

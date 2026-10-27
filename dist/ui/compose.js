@@ -139,6 +139,7 @@ function layoutPlay(input, vm) {
         charges: session.charges,
         maxCharges: session.maxCharges,
         tossedText: (0, copy_1.tossedLabel)(session.tossCount),
+        cooldownText: input.tossWaitMs > 0 ? (0, copy_1.cooldownLabel)(copy_1.TIER_NAME[input.tier], input.tossWaitMs) : '',
         showPerfect: session.cardsThisRun > 0,
         showBurnt: session.meter >= 85,
         cells,
@@ -161,14 +162,16 @@ function layoutResult(input, vm) {
     const card = result && result.cardName ? (0, copy_1.cardBody)(result.cardName) : copy_1.COPY.noCardBody;
     const reason = result && result.reason === 'grid_full' ? copy_1.COPY.fullFailTitle : copy_1.COPY.burnFailTitle;
     const detail = result && result.reason === 'grid_full' ? copy_1.COPY.fullFailBody : copy_1.COPY.burnFailBody;
+    const quip = result && result.quip ? result.quip : '';
     vm.result = {
         title: reason,
-        body: `${detail}${card}`,
+        body: `${detail}${quip}${card}`,
         scoreText: (0, copy_1.scoreLabel)(result ? result.score : 0),
+        recap: result ? (0, copy_1.roundRecap)(result.seconds, result.merges, result.tosses) : '',
     };
     const pad = 18;
     const bw = input.width - pad * 2;
-    let y = input.safeTop + 210;
+    let y = input.safeTop + 236;
     const stack = [];
     if (input.playsLeft > 0)
         stack.push({ id: 'again', label: copy_1.COPY.again, primary: true });

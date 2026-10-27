@@ -1,5 +1,5 @@
 {
-  "description": "颠勺大师 — 微信小游戏。AppID 占位为测试号，申请完成后替换 appid。",
+  "description": "颠勺王 — 微信小游戏。AppID 占位为测试号，申请完成后替换 appid。",
   "packOptions": {
     "ignore": [
       { "type": "folder", "value": "node_modules" },

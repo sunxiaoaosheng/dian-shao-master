@@ -48,12 +48,14 @@ export interface PlayVM {
   hint: string;
   wok: { x: number; y: number; w: number; h: number };
   nextBox: { x: number; y: number; w: number; h: number };
+  cooldownText: string;
 }
 
 export interface ResultVM {
   title: string;
   body: string;
   scoreText: string;
+  recap: string;
 }
 
 export interface AlbumCardVM {

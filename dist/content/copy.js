@@ -8,10 +8,12 @@ exports.cardToast = cardToast;
 exports.scoreLabel = scoreLabel;
 exports.chargesLabel = chargesLabel;
 exports.tossedLabel = tossedLabel;
+exports.roundRecap = roundRecap;
+exports.cooldownLabel = cooldownLabel;
 exports.pickLine = pickLine;
 /** 所有玩家能看见的句子都放这里，方便对着厨房口吻改，也方便测试挡住跑题的词。 */
 exports.COPY = {
-    title: '颠勺大师',
+    title: '颠勺王',
     subtitle: '同级食材挨在一起，就颠成下一味',
     start: '开炒',
     album: '招牌菜册',
@@ -24,7 +26,7 @@ exports.COPY = {
     toss: '手动颠勺',
     noPlays: '今天的免费锅用完了',
     playsHint: '每天 3 锅免费。分享自愿，不分享也能明天再来。',
-    hint: '点空位下锅。挨着的同级会并成下一味。',
+    hint: '点空位下锅。上下左右同级、还没糊的，并成下一味。斜着不算。',
     sensorLive: '握紧手机，向上颠一下',
     sensorFallback: '没拿到晃动权限，用手动颠勺',
     sensorDevtools: '模拟器没有真陀螺仪，先手动颠',
@@ -56,7 +58,7 @@ exports.COPY = {
     next: '下一手下锅',
     qaOn: '验收角标开了',
     qaOff: '验收角标关了',
-    menuShare: '颠勺大师：今晚这口锅你来',
+    menuShare: '颠勺王：今晚这口锅你来',
     seal: '勺',
     mergeLines: ['并成一味了', '火候叠上了', '香气拢到一块儿'],
     tossLines: ['颠起来了！', '锅气回来了', '糊味散了'],
@@ -95,6 +97,13 @@ function chargesLabel(n) {
 }
 function tossedLabel(n) {
     return `这锅颠了 ${n} 下`;
+}
+function roundRecap(seconds, merges, tosses) {
+    return `这口 ${seconds} 秒，合成 ${merges} 次，颠了 ${tosses} 下`;
+}
+function cooldownLabel(tierName, waitMs) {
+    const sec = (Math.max(0, waitMs) / 1000).toFixed(1);
+    return `${tierName}手感，还要等 ${sec} 秒`;
 }
 function pickLine(lines, seed) {
     if (!lines.length)

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CLIP_H = exports.CLIP_W = void 0;
 exports.paintClip = paintClip;
+const copy_1 = require("../content/copy");
 const draw_1 = require("../ui/draw");
 const theme_1 = require("../ui/theme");
 /** 竖屏 9:16，主体放在画面中部，对准颠起来的那一下。 */
@@ -13,7 +14,7 @@ function paintClip(ctx, moment) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.font = (0, theme_1.font)(18, false);
-    ctx.fillText('颠勺大师', exports.CLIP_W / 2, 72);
+    ctx.fillText(copy_1.COPY.title, exports.CLIP_W / 2, 72);
     ctx.save();
     ctx.translate(70, 150);
     (0, draw_1.fillTorn)(ctx, exports.CLIP_W - 140, 120, 7, theme_1.PALETTE.white, 0.05);

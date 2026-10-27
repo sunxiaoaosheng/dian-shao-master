@@ -22,7 +22,7 @@ const {
 const { emptyAlbum, grantCard } = require('../dist/meta/cards');
 const { createReservedRewardedAd, REWARDED_AD_UNIT_ID } = require('../dist/meta/ads');
 const { getRegionalBoard } = require('../dist/meta/leaderboard');
-const { COPY } = require('../dist/content/copy');
+const { COPY, roundRecap, cooldownLabel } = require('../dist/content/copy');
 const { ASSETS, LAYERS, MANIFEST_VERSION, assetById, foodIdForLevel } = require('../dist/content/manifest');
 const { TOAST_LINES, toastImageFor } = require('../dist/content/toasts');
 const { loadCollage, resetCollageForTests, spriteReady, spriteOrigin, beginSprites, queueBox, flushSprites } = require('../dist/ui/sprites');
@@ -160,6 +160,26 @@ function testMerge() {
     piece(2, 2),
   ], 2, 1, 4, 0);
   assert.equal(mismatch.mergeCount, 0);
+
+  const triple = resolveMerges([
+    piece(1, 1),
+    piece(2, 1),
+    piece(3, 1),
+  ], 3, 1, 4, 1);
+  assert.equal(triple.mergeCount, 1);
+  assert.equal(triple.cells.filter((cell) => cell.level === 2).length, 1);
+
+  const diagonal = resolveMerges([
+    piece(1, 1), piece(2, 2),
+    piece(3, 2), piece(4, 1),
+  ], 2, 2, 4, 0);
+  assert.equal(diagonal.mergeCount, 0, '斜着的同级不合成');
+
+  const vertical = resolveMerges([
+    piece(1, 1), piece(2, 3),
+    piece(3, 1), piece(4, 2),
+  ], 2, 2, 4, 0);
+  assert.equal(vertical.mergeCount, 1);
 }
 
 function testSession() {
@@ -263,6 +283,23 @@ function testSession() {
   assert.equal(HEAT[3].spawnIntervalMs, before);
   assert.equal(hell.heatId, 'hell');
   assert.equal(hell.maxCharges, 1);
+
+  const shortRound = createSession({
+    recipeId: 'huiguo',
+    maxLevel: 4,
+    profile: HEAT[0],
+    seed: 2,
+  });
+  let steps = 0;
+  while (shortRound.status === 'playing' && steps < 400) {
+    tick(shortRound, 100);
+    steps += 1;
+  }
+  assert.equal(shortRound.status, 'burnt_out', `试火应糊锅，实际 ${shortRound.status} ${shortRound.elapsedMs}ms`);
+  assert.ok(
+    shortRound.elapsedMs >= 12000 && shortRound.elapsedMs <= 28000,
+    `试火应是短局，实际 ${shortRound.elapsedMs}ms`,
+  );
 }
 
 function testDaily() {
@@ -484,6 +521,32 @@ function testCollage() {
   resetCollageForTests();
 }
 
+function testName() {
+  assert.equal(COPY.title, '颠勺王');
+  assert.ok(COPY.menuShare.startsWith('颠勺王'));
+  const files = [
+    'README.md',
+    'docs/COLLAGE_ART_SPEC.md',
+    'package.json',
+    'project.config.json',
+    'game.json',
+    'src/content/copy.ts',
+    'src/viral/clip.ts',
+    'src/viral/shareCard.ts',
+    'src/meta/share.ts',
+  ];
+  for (let i = 0; i < files.length; i += 1) {
+    const text = fs.readFileSync(path.join(__dirname, '..', files[i]), 'utf8');
+    const oldName = `颠勺${'大师'}`;
+    assert.ok(!text.includes(oldName), `${files[i]} 还写着旧展示名`);
+  }
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
+  assert.equal(pkg.name, 'dian-shao-master');
+  const project = JSON.parse(fs.readFileSync(path.join(__dirname, '../project.config.json'), 'utf8'));
+  assert.equal(project.projectname, 'dian-shao-master');
+  assert.ok(project.description.includes('颠勺王'));
+}
+
 function testWords() {
   const banned = /工位|周报|KPI|OKR|打卡|同事|老板|会议|PPT|职场|格子间|加班|最后一格|需求文档|排期|考勤/;
   const root = path.join(__dirname, '../src');
@@ -540,7 +603,16 @@ function testPaint() {
     toasts: [{ text: '颠起来了！', seed: 3, born: 4000, until: 6000 }],
     showTossButton: true,
     sensorLabel: '模拟器没有真陀螺仪，先手动颠',
-    result: { reason: 'burnt_out', score: 40, cardName: recipe.name },
+    result: {
+      reason: 'burnt_out',
+      score: 40,
+      cardName: recipe.name,
+      seconds: 18,
+      merges: 2,
+      tosses: 1,
+      quip: '糊了也是烟火气。',
+    },
+    tossWaitMs: 0,
     shake: 0.6,
     canSave: true,
     qa: { detected: 2, impulse: 1.8, angle: 30, unit: 'g', phase: 'fallback' },
@@ -556,6 +628,16 @@ function testPaint() {
   assert.equal(CARD_W / CARD_H, 1.25);
   assert.equal(hitTest([{ id: 'a', x: 0, y: 0, w: 10, h: 10 }], 3, 4), 'a');
   assert.equal(hitTest([{ id: 'a', x: 0, y: 0, w: 10, h: 10 }], 12, 4), null);
+
+  const settled = composeView(Object.assign({}, base, { screen: 'result' }));
+  assert.equal(settled.title, '颠勺王');
+  assert.ok(settled.result.recap.includes('18'));
+  assert.ok(settled.result.recap.includes('合成 2'));
+  assert.ok(settled.result.body.includes('糊了也是烟火气'));
+  assert.equal(roundRecap(18, 2, 1), settled.result.recap);
+  const cooling = composeView(Object.assign({}, base, { screen: 'play', tossWaitMs: 600 }));
+  assert.ok(cooling.play.cooldownText.includes('0.6'));
+  assert.equal(cooldownLabel('家常', 600), cooling.play.cooldownText);
 }
 
 function testBoot() {
@@ -617,7 +699,8 @@ testSession();
 testDaily();
 testGyro();
 testCollage();
+testName();
 testWords();
 testPaint();
 testBoot();
-console.log('颠勺大师测试通过');
+console.log('颠勺王测试通过');

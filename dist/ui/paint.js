@@ -232,6 +232,10 @@ function paintPlayText(ctx, vm) {
     (0, draw_1.drawWrapped)(ctx, note, noteX, play.nextBox.y, Math.max(80, noteW), 16);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
     ctx.fillText(play.tossedText, noteX, play.nextBox.y + 36);
+    if (play.cooldownText) {
+        ctx.fillStyle = theme_1.PALETTE.chiliDeep;
+        ctx.fillText(play.cooldownText, noteX, play.nextBox.y + 52);
+    }
     if (vm.shake > 0.2) {
         const cx = play.wok.x + play.wok.w / 2;
         const cy = play.wok.y + play.wok.h * 0.35;
@@ -270,18 +274,21 @@ function paintResult(ctx, vm) {
         return;
     ctx.save();
     ctx.translate(20, 28);
-    (0, draw_1.fillTorn)(ctx, vm.width - 40, 168, 21, theme_1.PALETTE.white, 0.05);
+    (0, draw_1.fillTorn)(ctx, vm.width - 40, 196, 21, theme_1.PALETTE.white, 0.05);
     ctx.fillStyle = theme_1.PALETTE.chiliDeep;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.font = (0, theme_1.font)(36, true);
-    ctx.fillText(result.title, 18, 18);
+    ctx.fillText(result.title, 18, 16);
     ctx.fillStyle = theme_1.PALETTE.ink;
     ctx.font = (0, theme_1.font)(16, true);
-    ctx.fillText(result.scoreText, 18, 64);
+    ctx.fillText(result.scoreText, 18, 58);
+    ctx.font = (0, theme_1.font)(14, true);
+    ctx.fillStyle = theme_1.PALETTE.ink;
+    ctx.fillText(result.recap, 18, 84);
     ctx.font = (0, theme_1.font)(15, false);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
-    (0, draw_1.drawWrapped)(ctx, result.body, 18, 96, vm.width - 78, 22);
+    (0, draw_1.drawWrapped)(ctx, result.body, 18, 108, vm.width - 78, 22);
     ctx.restore();
 }
 function paintAlbum(ctx, vm) {

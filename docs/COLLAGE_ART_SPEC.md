@@ -1,4 +1,4 @@
-# 《颠勺大师》实拍剪贴风资源规格
+# 《颠勺王》实拍剪贴风资源规格
 目录：`assets/ui/` · `assets/food/` · `assets/fx/` · `assets/type/`
 
 ## 总规范
