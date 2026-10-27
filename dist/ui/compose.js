@@ -22,6 +22,7 @@ function composeView(input) {
         goalText: input.goalText,
         feelText: (0, copy_1.tossFeelLine)(input.tier),
         sensorLabel: input.sensorLabel,
+        motionNeedsSetting: input.motionNeedsSetting,
         buttons: [],
         hits: [],
         toasts: liveToasts(input),
@@ -167,8 +168,12 @@ function layoutPlay(input, vm) {
         wok: { x: gx - 18, y: gy - 8, w: gridW + 36, h: gridH + 22 },
         nextBox: { x: 16, y: input.height - input.safeBottom - 92, w: 68, h: 76 },
     };
+    const tossY = input.height - input.safeBottom - 70;
+    if (input.motionNeedsSetting) {
+        vm.buttons.push(button('motionSetting', copy_1.COPY.motionSetting, 96, tossY - 44, 108, 34, true, false, false));
+    }
     if (input.showTossButton) {
-        vm.buttons.push(button('toss', copy_1.COPY.toss, input.width - 156, input.height - input.safeBottom - 70, 140, 46, true, session.charges <= 0, false));
+        vm.buttons.push(button('toss', copy_1.COPY.toss, input.width - 156, tossY, 140, 46, true, session.charges <= 0, false));
     }
     vm.toastY = gy + gridH * 0.42;
 }

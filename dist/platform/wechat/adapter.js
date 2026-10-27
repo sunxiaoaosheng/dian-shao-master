@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createWechatPlatform = createWechatPlatform;
+const motionConsent_1 = require("./motionConsent");
 const motion_1 = require("./motion");
 const storage_1 = require("./storage");
 function createWechatPlatform() {
@@ -51,6 +52,8 @@ function createWechatPlatform() {
         storageSet: (key, value) => (0, storage_1.writeStorage)(wx, key, value),
         startMotion: () => bridge.startMotion(),
         startAccel: () => bridge.startAccel(),
+        requestMotionConsent: () => (0, motionConsent_1.requestMotionConsent)(wx),
+        openMotionSettings: () => (0, motionConsent_1.openMotionSettings)(wx),
         setMotionHandler: (cb) => {
             bridge.sink.motion = cb;
         },

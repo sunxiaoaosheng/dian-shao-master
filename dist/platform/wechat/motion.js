@@ -1,10 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MOTION_START_MS = void 0;
 exports.createMotionBridge = createMotionBridge;
 /**
- * 只负责 wx.startDeviceMotionListening / onDeviceMotionChange
- * 和加速度计。采样交给 src/input/gyro.ts，这里不判断颠勺。
+ * 颠勺以设备方向为准：wx.startDeviceMotionListening / onDeviceMotionChange。
+ * 方向打开之后才补加速度计，失败不另走一套授权。
+ * 采样交给 src/input/gyro.ts，这里不判断颠勺。
  */
+/** 隐私弹窗可能压着 success。太短会在玩家点同意前被当成拒绝。 */
+exports.MOTION_START_MS = 8000;
 function createMotionBridge(wx) {
     let motionToken = 0;
     let accelToken = 0;
@@ -31,12 +35,24 @@ function createMotionBridge(wx) {
         const token = ++motionToken;
         return new Promise((resolve) => {
             var _a;
+            let settled = false;
+            const finish = (result) => {
+                if (settled)
+                    return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(result);
+            };
+            const timer = setTimeout(() => {
+                console.warn('[颠勺] 方向传感器没有在时限内回应');
+                finish('denied');
+            }, exports.MOTION_START_MS);
             (_a = wx.startDeviceMotionListening) === null || _a === void 0 ? void 0 : _a.call(wx, {
                 interval: 'game',
                 success: () => {
                     var _a;
                     if (token !== motionToken) {
-                        resolve('denied');
+                        finish('denied');
                         return;
                     }
                     if (motionHandler && wx.offDeviceMotionChange)
@@ -52,11 +68,11 @@ function createMotionBridge(wx) {
                         });
                     };
                     (_a = wx.onDeviceMotionChange) === null || _a === void 0 ? void 0 : _a.call(wx, motionHandler);
-                    resolve('ok');
+                    finish('ok');
                 },
                 fail: (err) => {
-                    console.warn('[颠勺] 动作传感器不可用', err && err.errMsg);
-                    resolve('denied');
+                    console.warn('[颠勺] 方向传感器不可用', err && err.errMsg);
+                    finish('denied');
                 },
             });
         });

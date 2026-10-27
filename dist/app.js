@@ -132,6 +132,7 @@ class GameApp {
             toasts: this.toasts,
             showTossButton: this.platform.isDevtools || this.sensorPhase !== 'live',
             sensorLabel: this.sensorLabel(),
+            motionNeedsSetting: !this.platform.isDevtools && this.sensorPhase === 'needAuth',
             result: this.result,
             tossWaitMs: Math.max(0, this.tossReadyAt - this.platform.now()),
             shake: this.shake,
@@ -173,6 +174,8 @@ class GameApp {
             this.goHome();
         else if (id === 'toss')
             this.tryToss('button');
+        else if (id === 'motionSetting')
+            this.askMotionSettings();
         else if (id === 'share')
             void this.shareVoluntary();
         else if (id === 'ad')
@@ -272,25 +275,53 @@ class GameApp {
                 this.announcedSensor = true;
                 this.toast(copy_1.COPY.sensorDevtools);
             }
+            return;
         }
-        else {
-            this.sensorPhase = 'pending';
-            this.sensorWaitUntil = this.platform.now() + 1200;
-        }
+        this.sensorPhase = 'pending';
+        this.sensorWaitUntil = Number.POSITIVE_INFINITY;
         void this.openSensors(gen);
     }
+    /** 点「去设置」时直接打开系统权限页，回来再听一次方向。 */
+    askMotionSettings() {
+        void this.platform.openMotionSettings().then(() => {
+            if (this.screen !== 'play' || this.platform.isDevtools)
+                return;
+            void this.openSensors(this.sensorGen);
+        });
+    }
     async openSensors(gen) {
+        if (this.platform.isDevtools)
+            return;
         const motion = await this.platform.startMotion();
-        const accel = await this.platform.startAccel();
         if (gen !== this.sensorGen)
             return;
-        if (motion !== 'ok' && accel !== 'ok') {
-            this.sensorPhase = 'fallback';
-            if (!this.platform.isDevtools && !this.toldFallback) {
-                this.toldFallback = true;
-                this.toast(copy_1.COPY.sensorFallback);
+        if (motion === 'ok') {
+            this.armMotionWait();
+            void this.platform.startAccel();
+            return;
+        }
+        if (motion === 'unsupported') {
+            this.markSensorFallback();
+            return;
+        }
+        const consent = await this.platform.requestMotionConsent();
+        if (gen !== this.sensorGen)
+            return;
+        if (consent === 'granted') {
+            const again = await this.platform.startMotion();
+            if (gen !== this.sensorGen)
+                return;
+            if (again === 'ok') {
+                this.armMotionWait();
+                void this.platform.startAccel();
+                return;
             }
         }
+        this.markSensorNeedAuth();
+    }
+    armMotionWait() {
+        this.sensorPhase = 'pending';
+        this.sensorWaitUntil = this.platform.now() + 1500;
     }
     watchSensor() {
         if (this.platform.isDevtools || this.sensorPhase !== 'pending')
@@ -301,11 +332,21 @@ class GameApp {
             this.sensorPhase = 'live';
             return;
         }
+        this.markSensorNeedAuth();
+    }
+    markSensorNeedAuth() {
+        this.sensorPhase = 'needAuth';
+        if (this.toldFallback)
+            return;
+        this.toldFallback = true;
+        this.toast(copy_1.COPY.sensorNeedAuth);
+    }
+    markSensorFallback() {
         this.sensorPhase = 'fallback';
-        if (!this.toldFallback) {
-            this.toldFallback = true;
-            this.toast(copy_1.COPY.sensorFallback);
-        }
+        if (this.toldFallback)
+            return;
+        this.toldFallback = true;
+        this.toast(copy_1.COPY.sensorFallback);
     }
     captureMoment(energy) {
         const dish = this.recipe ? this.recipe.name : '';
@@ -476,6 +517,8 @@ class GameApp {
     sensorLabel() {
         if (this.platform.isDevtools)
             return copy_1.COPY.sensorDevtools;
+        if (this.sensorPhase === 'needAuth')
+            return copy_1.COPY.sensorNeedAuth;
         if (this.sensorPhase === 'fallback')
             return copy_1.COPY.sensorFallback;
         if (this.sensorPhase === 'live')

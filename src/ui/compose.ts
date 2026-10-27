@@ -59,6 +59,7 @@ export interface ComposeInput {
   toasts: ToastState[];
   showTossButton: boolean;
   sensorLabel: string;
+  motionNeedsSetting: boolean;
   result: {
     reason: FailReason;
     score: number;
@@ -94,6 +95,7 @@ export function composeView(input: ComposeInput): ViewModel {
     goalText: input.goalText,
     feelText: tossFeelLine(input.tier),
     sensorLabel: input.sensorLabel,
+    motionNeedsSetting: input.motionNeedsSetting,
     buttons: [],
     hits: [],
     toasts: liveToasts(input),
@@ -237,12 +239,16 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
     wok: { x: gx - 18, y: gy - 8, w: gridW + 36, h: gridH + 22 },
     nextBox: { x: 16, y: input.height - input.safeBottom - 92, w: 68, h: 76 },
   };
+  const tossY = input.height - input.safeBottom - 70;
+  if (input.motionNeedsSetting) {
+    vm.buttons.push(button('motionSetting', COPY.motionSetting, 96, tossY - 44, 108, 34, true, false, false));
+  }
   if (input.showTossButton) {
     vm.buttons.push(button(
       'toss',
       COPY.toss,
       input.width - 156,
-      input.height - input.safeBottom - 70,
+      tossY,
       140,
       46,
       true,

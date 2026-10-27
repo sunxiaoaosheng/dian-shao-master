@@ -44,6 +44,18 @@ export interface WechatMiniGame {
   getStorageSync(key: string): unknown;
   setStorageSync(key: string, value: string): void;
   startDeviceMotionListening?(opts: WxListenOpts): void;
+  authorize?(opts: { scope: string; success?: () => void; fail?: (err?: { errMsg?: string }) => void }): void;
+  getSetting?(opts: {
+    success?: (res: { authSetting?: Record<string, boolean> }) => void;
+    fail?: () => void;
+  }): void;
+  getPrivacySetting?(opts: {
+    success?: (res: { needAuthorization?: boolean }) => void;
+    fail?: () => void;
+  }): void;
+  requirePrivacyAuthorize?(opts: { success?: () => void; fail?: () => void }): void;
+  openSetting?(opts: { success?: () => void; fail?: () => void }): void;
+  openAppAuthorizeSetting?(opts: { success?: () => void; fail?: () => void }): void;
   stopDeviceMotionListening?(opts?: { success?: () => void; fail?: () => void }): void;
   onDeviceMotionChange?(cb: (res: { alpha?: number; beta?: number; gamma?: number }) => void): void;
   offDeviceMotionChange?(cb: (res: { alpha?: number; beta?: number; gamma?: number }) => void): void;

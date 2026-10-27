@@ -20,6 +20,10 @@ export interface Platform {
   storageSet(key: string, value: string): void;
   startMotion(): Promise<'ok' | 'denied' | 'unsupported'>;
   startAccel(): Promise<'ok' | 'denied' | 'unsupported'>;
+  /** 方向监听失败后：隐私弹窗，再试 scope.accelerometer。 */
+  requestMotionConsent(): Promise<'granted' | 'settings'>;
+  /** 由「去设置」点击直接打开微信的系统权限页。 */
+  openMotionSettings(): Promise<void>;
   setMotionHandler(cb: (res: { alpha: number; beta: number; gamma: number }) => void): void;
   setAccelHandler(cb: (res: { x: number; y: number; z: number }) => void): void;
   stopSensors(): void;

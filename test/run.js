@@ -62,6 +62,8 @@ const {
   wrapDeg,
 } = require('../dist/input/gyro');
 const { hitTest } = require('../dist/input/pointer');
+const { requestMotionConsent, openMotionSettings, MOTION_SCOPE } = require('../dist/platform/wechat/motionConsent');
+const { MOTION_START_MS } = require('../dist/platform/wechat/motion');
 const { composeView } = require('../dist/ui/compose');
 const { paint } = require('../dist/ui/paint');
 const { paintClip, CLIP_W, CLIP_H } = require('../dist/viral/clip');
@@ -441,6 +443,14 @@ function testGyro() {
   }
   const accelResult = pushAll(accelOnly, accelSamples);
   assert.equal(accelResult.fires, 1, `只有加速度计也应认出猛颠 impulse ${accelResult.maxI}`);
+
+  const deadMotion = script(1, [{ t: 900, strength: 1 }]).map((sample) => Object.assign({}, sample, {
+    alpha: 0,
+    beta: 0,
+    gamma: 0,
+  }));
+  const rescued = pushAll(createTossDetector('standard'), deadMotion);
+  assert.equal(rescued.fires, 1, `方向一直是 0 时加速度仍应认出颠勺 impulse ${rescued.maxI}`);
 }
 
 function pngInfo(buf) {
@@ -655,6 +665,7 @@ function testPaint() {
     toasts: [{ text: '颠起来了！', seed: 3, born: 4000, until: 6000 }],
     showTossButton: true,
     sensorLabel: '模拟器没有真陀螺仪，先手动颠',
+    motionNeedsSetting: false,
     result: {
       reason: 'burnt_out',
       score: 40,
@@ -701,6 +712,17 @@ function testPaint() {
   assert.equal(assetById(SHARE_STICKER_ID).file, 'assets/type/type-toast-05.png');
   assert.equal(CLIP_W, 540);
   assert.equal(CLIP_H, 960);
+  const needAuth = composeView(Object.assign({}, base, {
+    screen: 'play',
+    motionNeedsSetting: true,
+    sensorLabel: COPY.sensorNeedAuth,
+  }));
+  assert.equal(needAuth.sensorLabel, '需要运动与方向权限才能颠勺');
+  assert.ok(needAuth.buttons.some((button) => button.id === 'motionSetting' && button.label === '去设置'));
+  assert.ok(needAuth.buttons.some((button) => button.id === 'toss'));
+  const devtools = composeView(Object.assign({}, base, { screen: 'play', motionNeedsSetting: false }));
+  assert.ok(!devtools.buttons.some((button) => button.id === 'motionSetting'));
+
   const cooling = composeView(Object.assign({}, base, { screen: 'play', tossWaitMs: 600 }));
   assert.ok(cooling.play.cooldownText.includes('0.6'));
   assert.equal(cooldownLabel('家常', 600), cooling.play.cooldownText);
@@ -800,6 +822,79 @@ function testFeel() {
   assert.ok(restartLine(2, false, '试火').includes('仍是试火'));
   assert.ok(restartLine(0, false, '试火', 1).includes('分享'));
   assert.ok(restartLine(0, false, '试火', 0).includes('明天'));
+}
+
+function testMotionAuth() {
+  assert.equal(MOTION_SCOPE, 'scope.accelerometer');
+  assert.ok(MOTION_START_MS >= 5000);
+  const appSrc = fs.readFileSync(path.join(__dirname, '../src/app.ts'), 'utf8');
+  const begin = appSrc.slice(appSrc.indexOf('private beginSensors'), appSrc.indexOf('private askMotionSettings'));
+  assert.ok(begin.includes('isDevtools'));
+  assert.ok(begin.indexOf('isDevtools') < begin.indexOf('openSensors'));
+  const open = appSrc.slice(appSrc.indexOf('private async openSensors'), appSrc.indexOf('private armMotionWait'));
+  assert.ok(open.includes('startMotion('));
+  assert.ok(open.includes('requestMotionConsent'));
+  assert.ok(open.indexOf('startMotion') < open.indexOf('startAccel'));
+  const motionSrc = fs.readFileSync(path.join(__dirname, '../src/platform/wechat/motion.ts'), 'utf8');
+  assert.ok(motionSrc.includes('startDeviceMotionListening'));
+
+  let privacy = false;
+  let authorized = false;
+  let settingReads = 0;
+  return requestMotionConsent({
+    getPrivacySetting(opts) {
+      opts.success({ needAuthorization: true });
+    },
+    requirePrivacyAuthorize(opts) {
+      privacy = true;
+      opts.success();
+    },
+    authorize() {
+      authorized = true;
+    },
+  }).then((consent) => {
+    assert.equal(consent, 'granted');
+    assert.equal(privacy, true);
+    assert.equal(authorized, false);
+    return requestMotionConsent({
+      getPrivacySetting(opts) {
+        opts.success({ needAuthorization: false });
+      },
+      getSetting(opts) {
+        settingReads += 1;
+        opts.success({ authSetting: {} });
+      },
+      authorize(opts) {
+        assert.equal(opts.scope, 'scope.accelerometer');
+        opts.success();
+      },
+    });
+  }).then((consent) => {
+    assert.equal(consent, 'granted');
+    assert.equal(settingReads, 1);
+    return requestMotionConsent({
+      getSetting(opts) {
+        opts.success({ authSetting: { 'scope.accelerometer': false } });
+      },
+      authorize() {
+        throw new Error('已经拒绝过的 scope 不应再弹 authorize');
+      },
+    });
+  }).then((consent) => {
+    assert.equal(consent, 'settings');
+    let opened = '';
+    return openMotionSettings({
+      openAppAuthorizeSetting(opts) {
+        opened = 'app';
+        opts.success();
+      },
+      openSetting() {
+        opened = 'mini';
+      },
+    }).then(() => {
+      assert.equal(opened, 'app');
+    });
+  });
 }
 
 function testBoot() {
@@ -931,7 +1026,7 @@ testWords();
 testPaint();
 testFeel();
 testBoot();
-testHooks().then(() => {
+testMotionAuth().then(() => testHooks()).then(() => {
   console.log('颠勺王测试通过');
 }).catch((err) => {
   console.error(err);

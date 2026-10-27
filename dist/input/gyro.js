@@ -198,12 +198,13 @@ class TossDetector {
     matches(impulse, angle) {
         const accelNeed = this.tier.accelG;
         const angleNeed = this.tier.angleDeg;
-        if (this.seenMotion && this.seenAccel) {
+        const motionUsable = this.seenMotion && this.motionNonZero;
+        if (motionUsable && this.seenAccel) {
             return impulse >= accelNeed && angle >= angleNeed;
         }
         if (this.seenAccel)
             return impulse >= accelNeed * 1.25;
-        if (this.seenMotion)
+        if (motionUsable)
             return angle >= angleNeed * 1.35;
         return false;
     }

@@ -52,7 +52,7 @@ import { momentLine } from './viral/moment';
 import type { TossMoment } from './viral/moment';
 import { CARD_H, CARD_W, paintShareCard } from './viral/shareCard';
 
-type SensorPhase = 'pending' | 'live' | 'fallback';
+type SensorPhase = 'pending' | 'live' | 'fallback' | 'needAuth';
 
 export function startGame(platform: Platform): void {
   const app = new GameApp(platform);
@@ -179,6 +179,7 @@ class GameApp {
       toasts: this.toasts,
       showTossButton: this.platform.isDevtools || this.sensorPhase !== 'live',
       sensorLabel: this.sensorLabel(),
+      motionNeedsSetting: !this.platform.isDevtools && this.sensorPhase === 'needAuth',
       result: this.result,
       tossWaitMs: Math.max(0, this.tossReadyAt - this.platform.now()),
       shake: this.shake,
@@ -215,6 +216,7 @@ class GameApp {
     else if (id === 'album') this.screen = 'album';
     else if (id === 'home') this.goHome();
     else if (id === 'toss') this.tryToss('button');
+    else if (id === 'motionSetting') this.askMotionSettings();
     else if (id === 'share') void this.shareVoluntary();
     else if (id === 'ad') void this.watchAd();
     else if (id === 'save') void this.saveClip();
@@ -311,24 +313,51 @@ class GameApp {
         this.announcedSensor = true;
         this.toast(COPY.sensorDevtools);
       }
-    } else {
-      this.sensorPhase = 'pending';
-      this.sensorWaitUntil = this.platform.now() + 1200;
+      return;
     }
+    this.sensorPhase = 'pending';
+    this.sensorWaitUntil = Number.POSITIVE_INFINITY;
     void this.openSensors(gen);
   }
 
+  /** 点「去设置」时直接打开系统权限页，回来再听一次方向。 */
+  private askMotionSettings(): void {
+    void this.platform.openMotionSettings().then(() => {
+      if (this.screen !== 'play' || this.platform.isDevtools) return;
+      void this.openSensors(this.sensorGen);
+    });
+  }
+
   private async openSensors(gen: number): Promise<void> {
+    if (this.platform.isDevtools) return;
     const motion = await this.platform.startMotion();
-    const accel = await this.platform.startAccel();
     if (gen !== this.sensorGen) return;
-    if (motion !== 'ok' && accel !== 'ok') {
-      this.sensorPhase = 'fallback';
-      if (!this.platform.isDevtools && !this.toldFallback) {
-        this.toldFallback = true;
-        this.toast(COPY.sensorFallback);
+    if (motion === 'ok') {
+      this.armMotionWait();
+      void this.platform.startAccel();
+      return;
+    }
+    if (motion === 'unsupported') {
+      this.markSensorFallback();
+      return;
+    }
+    const consent = await this.platform.requestMotionConsent();
+    if (gen !== this.sensorGen) return;
+    if (consent === 'granted') {
+      const again = await this.platform.startMotion();
+      if (gen !== this.sensorGen) return;
+      if (again === 'ok') {
+        this.armMotionWait();
+        void this.platform.startAccel();
+        return;
       }
     }
+    this.markSensorNeedAuth();
+  }
+
+  private armMotionWait(): void {
+    this.sensorPhase = 'pending';
+    this.sensorWaitUntil = this.platform.now() + 1500;
   }
 
   private watchSensor(): void {
@@ -338,11 +367,21 @@ class GameApp {
       this.sensorPhase = 'live';
       return;
     }
+    this.markSensorNeedAuth();
+  }
+
+  private markSensorNeedAuth(): void {
+    this.sensorPhase = 'needAuth';
+    if (this.toldFallback) return;
+    this.toldFallback = true;
+    this.toast(COPY.sensorNeedAuth);
+  }
+
+  private markSensorFallback(): void {
     this.sensorPhase = 'fallback';
-    if (!this.toldFallback) {
-      this.toldFallback = true;
-      this.toast(COPY.sensorFallback);
-    }
+    if (this.toldFallback) return;
+    this.toldFallback = true;
+    this.toast(COPY.sensorFallback);
   }
 
   private captureMoment(energy: number): void {
@@ -504,6 +543,7 @@ class GameApp {
 
   private sensorLabel(): string {
     if (this.platform.isDevtools) return COPY.sensorDevtools;
+    if (this.sensorPhase === 'needAuth') return COPY.sensorNeedAuth;
     if (this.sensorPhase === 'fallback') return COPY.sensorFallback;
     if (this.sensorPhase === 'live') return COPY.sensorLive;
     return COPY.sensorPending;

@@ -1,4 +1,5 @@
 import type { Ctx } from '../../ui/ctx';
+import { openMotionSettings, requestMotionConsent } from './motionConsent';
 import { createMotionBridge } from './motion';
 import { readStorage, writeStorage } from './storage';
 import type { Platform } from '../types';
@@ -53,6 +54,8 @@ export function createWechatPlatform(): Platform {
     storageSet: (key, value) => writeStorage(wx, key, value),
     startMotion: () => bridge.startMotion(),
     startAccel: () => bridge.startAccel(),
+    requestMotionConsent: () => requestMotionConsent(wx),
+    openMotionSettings: () => openMotionSettings(wx),
     setMotionHandler: (cb) => {
       bridge.sink.motion = cb;
     },

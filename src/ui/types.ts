@@ -92,6 +92,7 @@ export interface ViewModel {
   goalText: string;
   feelText: string;
   sensorLabel: string;
+  motionNeedsSetting: boolean;
   boardNote: string;
   buttons: ButtonVM[];
   hits: HitRect[];

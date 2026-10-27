@@ -8,9 +8,13 @@ export interface MotionSink {
 }
 
 /**
- * 只负责 wx.startDeviceMotionListening / onDeviceMotionChange
- * 和加速度计。采样交给 src/input/gyro.ts，这里不判断颠勺。
+ * 颠勺以设备方向为准：wx.startDeviceMotionListening / onDeviceMotionChange。
+ * 方向打开之后才补加速度计，失败不另走一套授权。
+ * 采样交给 src/input/gyro.ts，这里不判断颠勺。
  */
+
+/** 隐私弹窗可能压着 success。太短会在玩家点同意前被当成拒绝。 */
+export const MOTION_START_MS = 8000;
 export function createMotionBridge(wx: WechatMiniGame) {
   let motionToken = 0;
   let accelToken = 0;
@@ -33,11 +37,22 @@ export function createMotionBridge(wx: WechatMiniGame) {
     if (!wx.startDeviceMotionListening || !wx.onDeviceMotionChange) return Promise.resolve('unsupported');
     const token = ++motionToken;
     return new Promise((resolve) => {
+      let settled = false;
+      const finish = (result: SensorStart) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      };
+      const timer = setTimeout(() => {
+        console.warn('[颠勺] 方向传感器没有在时限内回应');
+        finish('denied');
+      }, MOTION_START_MS);
       wx.startDeviceMotionListening?.({
         interval: 'game',
         success: () => {
           if (token !== motionToken) {
-            resolve('denied');
+            finish('denied');
             return;
           }
           if (motionHandler && wx.offDeviceMotionChange) wx.offDeviceMotionChange(motionHandler);
@@ -50,11 +65,11 @@ export function createMotionBridge(wx: WechatMiniGame) {
             });
           };
           wx.onDeviceMotionChange?.(motionHandler);
-          resolve('ok');
+          finish('ok');
         },
         fail: (err) => {
-          console.warn('[颠勺] 动作传感器不可用', err && err.errMsg);
-          resolve('denied');
+          console.warn('[颠勺] 方向传感器不可用', err && err.errMsg);
+          finish('denied');
         },
       });
     });

@@ -249,8 +249,9 @@ function paintPlayText(ctx, vm) {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.font = (0, theme_1.font)(12, false);
-    const note = play.overflowText || play.hint || vm.sensorLabel;
-    ctx.fillStyle = play.overflowText ? theme_1.PALETTE.chiliDeep : theme_1.PALETTE.inkSoft;
+    const authNote = vm.motionNeedsSetting ? vm.sensorLabel : '';
+    const note = play.overflowText || authNote || play.hint || vm.sensorLabel;
+    ctx.fillStyle = play.overflowText || authNote ? theme_1.PALETTE.chiliDeep : theme_1.PALETTE.inkSoft;
     const noteX = play.nextBox.x + play.nextBox.w + 8;
     const noteW = play.showTossButton ? vm.width - noteX - 160 : vm.width - noteX - 16;
     (0, draw_1.drawWrapped)(ctx, note, noteX, play.nextBox.y, Math.max(80, noteW), 16);
