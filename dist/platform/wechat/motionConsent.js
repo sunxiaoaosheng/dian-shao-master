@@ -2,7 +2,7 @@
 /**
  * 方向传感器没有单独的 wx.authorize scope。
  * 小游戏权限表里和运动最接近、调用方点名要试的是 scope.accelerometer。
- * 方向本身还要先过隐私同意；玩家拒绝后只能去系统设置。
+ * 方向本身还要先过隐私同意。iOS「设置 → 微信」里没有运动开关，对局不要打开那一页。
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MOTION_SCOPE = void 0;
@@ -64,7 +64,7 @@ function accelScope(wx) {
         }
     });
 }
-/** 先隐私弹窗，再试 scope.accelerometer。已经拒绝过的 scope 不再调 authorize，交给设置页。 */
+/** 先隐私弹窗，再试 scope.accelerometer。已经拒绝过的 scope 不再调 authorize。 */
 async function requestMotionConsent(wx) {
     if (wx.getPrivacySetting && wx.requirePrivacyAuthorize) {
         const needed = await privacyNeeded(wx);
@@ -81,7 +81,7 @@ async function requestMotionConsent(wx) {
     const ok = await ask((opts) => { var _a; return (_a = wx.authorize) === null || _a === void 0 ? void 0 : _a.call(wx, { scope: exports.MOTION_SCOPE, success: opts.success, fail: opts.fail }); });
     return ok ? 'granted' : 'settings';
 }
-/** 去系统里的微信权限页。没有这个接口时再打开小游戏设置。必须由点击直接调用。 */
+/** 系统权限页。对局不调用：iOS 微信设置里没有运动开关。 */
 function openMotionSettings(wx) {
     return new Promise((resolve) => {
         const done = () => resolve();

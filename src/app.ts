@@ -37,7 +37,7 @@ import {
   usesTestPotQuota,
 } from './meta/daily';
 import type { DailyState } from './meta/daily';
-import { didGraduate, pickProfile } from './meta/difficulty';
+import { didGraduate, pickProfile, practiceProfile } from './meta/difficulty';
 import { KEY_ALBUM, KEY_DAILY, KEY_META } from './meta/keys';
 import { BOARD_ENABLED, fetchRegionalBoard } from './meta/leaderboard';
 import type { BoardEntry } from './meta/leaderboard';
@@ -55,7 +55,7 @@ import { momentLine } from './viral/moment';
 import type { TossMoment } from './viral/moment';
 import { CARD_H, CARD_W, paintShareCard } from './viral/shareCard';
 
-type SensorPhase = 'pending' | 'live' | 'fallback' | 'needAuth';
+type SensorPhase = 'pending' | 'live' | 'fallback' | 'deaf';
 
 export function startGame(platform: Platform): void {
   const app = new GameApp(platform);
@@ -83,7 +83,10 @@ class GameApp {
   private sensorWaitUntil = 0;
   private tossReadyAt = 0;
   private shake = 0;
-  private detectedTosses = 0;
+  private gyroHits = 0;
+  private gyroStreak = 0;
+  private lastGyroAt = 0;
+  private samplesSeen = 0;
   private qaMode = false;
   private sealTaps = 0;
   private sealWindow = 0;
@@ -162,7 +165,7 @@ class GameApp {
 
   private snapshot() {
     const peek = this.detector.peek();
-    const upcoming = pickProfile(this.meta.runsCompleted);
+    const upcoming = this.heatProfile();
     return {
       screen: this.screen,
       width: this.platform.width,
@@ -184,16 +187,17 @@ class GameApp {
       album: this.album,
       board: this.board,
       toasts: this.toasts,
-      showTossButton: this.platform.isDevtools || this.sensorPhase !== 'live',
+      showTossButton: this.keepManualToss(),
       sensorLabel: this.sensorLabel(),
-      motionNeedsSetting: !this.platform.isDevtools && this.sensorPhase === 'needAuth',
+      motionNeedsSetting: !this.platform.isDevtools && (this.sensorPhase === 'deaf' || this.sensorPhase === 'fallback'),
+      gyroHits: this.gyroHits,
       result: this.result,
       tossWaitMs: Math.max(0, this.tossReadyAt - this.platform.now()),
       shake: this.shake,
       canSave: Boolean(this.lastClipPath),
       qa: this.qaMode
         ? {
-            detected: this.detectedTosses,
+            detected: this.gyroHits,
             impulse: peek.impulse,
             angle: peek.angle,
             unit: peek.unit,
@@ -224,7 +228,7 @@ class GameApp {
     else if (id === 'album') this.screen = 'album';
     else if (id === 'home') this.goHome();
     else if (id === 'toss') this.tryToss('button');
-    else if (id === 'motionSetting') this.askMotionSettings();
+    else if (id === 'retryListen') this.retryListen();
     else if (id === 'share') void this.shareVoluntary();
     else if (id === 'ad') void this.watchAd();
     else if (id === 'save') void this.saveClip();
@@ -232,6 +236,11 @@ class GameApp {
 
   private potQuota(): number {
     return freePlaysFor(this.practice);
+  }
+
+  private heatProfile() {
+    const picked = pickProfile(this.meta.runsCompleted);
+    return this.practice ? practiceProfile(picked) : picked;
   }
 
   private resetTodayPots(): void {
@@ -253,7 +262,7 @@ class GameApp {
       this.toast(COPY.noPlays);
       return;
     }
-    const profile = pickProfile(this.meta.runsCompleted);
+    const profile = this.heatProfile();
     this.recipe = recipeForRun(this.meta.runsCompleted);
     this.session = createSession({
       recipeId: this.recipe.id,
@@ -293,7 +302,11 @@ class GameApp {
       if (source === 'button') this.toast(COPY.tossSoon);
       return;
     }
-    const result = applyToss(this.session);
+    let result = applyToss(this.session);
+    if (!result.ok && result.reason === 'empty' && this.practice) {
+      this.session.charges = Math.max(this.session.maxCharges, 8);
+      result = applyToss(this.session);
+    }
     if (!result.ok) {
       if (result.reason === 'empty' && (source === 'button' || !this.toldNoCharge)) {
         this.toldNoCharge = true;
@@ -311,6 +324,7 @@ class GameApp {
   }
 
   private feed(sample: Parameters<TossDetector['push']>[0]): void {
+    this.samplesSeen += 1;
     const event = this.detector.push(sample);
     if (this.detector.isLive() && !this.platform.isDevtools) this.sensorPhase = 'live';
     if (!this.loggedLive && this.detector.isLive()) {
@@ -318,9 +332,20 @@ class GameApp {
       console.log('[颠勺] 传感器就绪', this.detector.peek().unit, '冷却ms', cooldownMsFor(this.meta.tier));
     }
     if (!event) return;
-    this.detectedTosses += 1;
-    console.log('[颠勺] 识别', this.detectedTosses);
+    const now = this.platform.now();
+    if (now - this.lastGyroAt > 2500) this.gyroStreak = 0;
+    this.gyroStreak += 1;
+    this.gyroHits += 1;
+    this.lastGyroAt = now;
+    console.log('[颠勺] 识别', this.gyroHits);
     this.tryToss('gyro');
+  }
+
+  /** 测试期真机保留手动颠勺，直到传感器连续认出 3 下。 */
+  private keepManualToss(): boolean {
+    if (this.platform.isDevtools) return true;
+    if (this.practice && this.gyroStreak < 3) return true;
+    return this.sensorPhase !== 'live';
   }
 
   private beginSensors(): void {
@@ -328,7 +353,10 @@ class GameApp {
     this.platform.stopSensors();
     this.mux.reset();
     this.detector = createTossDetector(this.meta.tier);
-    this.detectedTosses = 0;
+    this.gyroHits = 0;
+    this.gyroStreak = 0;
+    this.lastGyroAt = 0;
+    this.samplesSeen = 0;
     this.loggedLive = false;
     if (this.platform.isDevtools) {
       this.sensorPhase = 'fallback';
@@ -343,42 +371,46 @@ class GameApp {
     void this.openSensors(gen);
   }
 
-  /** 点「去设置」时直接打开系统权限页，回来再听一次方向。 */
-  private askMotionSettings(): void {
-    void this.platform.openMotionSettings().then(() => {
-      if (this.screen !== 'play' || this.platform.isDevtools) return;
-      void this.openSensors(this.sensorGen);
-    });
+  /** 再听一次方向和加速度。不打开系统设置页。 */
+  private retryListen(): void {
+    if (this.screen !== 'play' || this.platform.isDevtools) return;
+    this.toldFallback = false;
+    this.beginSensors();
   }
 
   private async openSensors(gen: number): Promise<void> {
     if (this.platform.isDevtools) return;
-    const motion = await this.platform.startMotion();
+    const motionPromise = this.platform.startMotion();
+    const accelPromise = this.platform.startAccel();
+    const motion = await motionPromise;
+    const accel = await accelPromise;
     if (gen !== this.sensorGen) return;
-    if (motion === 'ok') {
+    if (motion === 'ok' || accel === 'ok') {
       this.armMotionWait();
-      void this.platform.startAccel();
       return;
     }
-    if (motion === 'unsupported') {
+    if (motion === 'unsupported' && accel === 'unsupported') {
       this.markSensorFallback();
       return;
     }
     const consent = await this.platform.requestMotionConsent();
     if (gen !== this.sensorGen) return;
     if (consent === 'granted') {
-      const again = await this.platform.startMotion();
+      const againMotion = this.platform.startMotion();
+      const againAccel = this.platform.startAccel();
+      const motionAgain = await againMotion;
+      const accelAgain = await againAccel;
       if (gen !== this.sensorGen) return;
-      if (again === 'ok') {
+      if (motionAgain === 'ok' || accelAgain === 'ok') {
         this.armMotionWait();
-        void this.platform.startAccel();
         return;
       }
     }
-    this.markSensorNeedAuth();
+    this.markSensorDeaf();
   }
 
   private armMotionWait(): void {
+    if (this.sensorPhase === 'live') return;
     this.sensorPhase = 'pending';
     this.sensorWaitUntil = this.platform.now() + 1500;
   }
@@ -386,18 +418,18 @@ class GameApp {
   private watchSensor(): void {
     if (this.platform.isDevtools || this.sensorPhase !== 'pending') return;
     if (this.platform.now() <= this.sensorWaitUntil) return;
-    if (this.detector.isLive()) {
+    if (this.samplesSeen > 0 && this.detector.isLive()) {
       this.sensorPhase = 'live';
       return;
     }
-    this.markSensorNeedAuth();
+    this.markSensorDeaf();
   }
 
-  private markSensorNeedAuth(): void {
-    this.sensorPhase = 'needAuth';
+  private markSensorDeaf(): void {
+    this.sensorPhase = 'deaf';
     if (this.toldFallback) return;
     this.toldFallback = true;
-    this.toast(COPY.sensorNeedAuth);
+    this.toast(COPY.sensorDeaf);
   }
 
   private markSensorFallback(): void {
@@ -566,7 +598,7 @@ class GameApp {
 
   private sensorLabel(): string {
     if (this.platform.isDevtools) return COPY.sensorDevtools;
-    if (this.sensorPhase === 'needAuth') return COPY.sensorNeedAuth;
+    if (this.sensorPhase === 'deaf') return COPY.sensorDeaf;
     if (this.sensorPhase === 'fallback') return COPY.sensorFallback;
     if (this.sensorPhase === 'live') return COPY.sensorLive;
     return COPY.sensorPending;

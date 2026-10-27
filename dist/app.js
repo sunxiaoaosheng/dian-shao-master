@@ -43,7 +43,10 @@ class GameApp {
         this.sensorWaitUntil = 0;
         this.tossReadyAt = 0;
         this.shake = 0;
-        this.detectedTosses = 0;
+        this.gyroHits = 0;
+        this.gyroStreak = 0;
+        this.lastGyroAt = 0;
+        this.samplesSeen = 0;
         this.qaMode = false;
         this.sealTaps = 0;
         this.sealWindow = 0;
@@ -111,7 +114,7 @@ class GameApp {
     }
     snapshot() {
         const peek = this.detector.peek();
-        const upcoming = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
+        const upcoming = this.heatProfile();
         return {
             screen: this.screen,
             width: this.platform.width,
@@ -133,16 +136,17 @@ class GameApp {
             album: this.album,
             board: this.board,
             toasts: this.toasts,
-            showTossButton: this.platform.isDevtools || this.sensorPhase !== 'live',
+            showTossButton: this.keepManualToss(),
             sensorLabel: this.sensorLabel(),
-            motionNeedsSetting: !this.platform.isDevtools && this.sensorPhase === 'needAuth',
+            motionNeedsSetting: !this.platform.isDevtools && (this.sensorPhase === 'deaf' || this.sensorPhase === 'fallback'),
+            gyroHits: this.gyroHits,
             result: this.result,
             tossWaitMs: Math.max(0, this.tossReadyAt - this.platform.now()),
             shake: this.shake,
             canSave: Boolean(this.lastClipPath),
             qa: this.qaMode
                 ? {
-                    detected: this.detectedTosses,
+                    detected: this.gyroHits,
                     impulse: peek.impulse,
                     angle: peek.angle,
                     unit: peek.unit,
@@ -179,8 +183,8 @@ class GameApp {
             this.goHome();
         else if (id === 'toss')
             this.tryToss('button');
-        else if (id === 'motionSetting')
-            this.askMotionSettings();
+        else if (id === 'retryListen')
+            this.retryListen();
         else if (id === 'share')
             void this.shareVoluntary();
         else if (id === 'ad')
@@ -190,6 +194,10 @@ class GameApp {
     }
     potQuota() {
         return (0, daily_1.freePlaysFor)(this.practice);
+    }
+    heatProfile() {
+        const picked = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
+        return this.practice ? (0, difficulty_1.practiceProfile)(picked) : picked;
     }
     resetTodayPots() {
         this.refreshDate();
@@ -211,7 +219,7 @@ class GameApp {
             this.toast(copy_1.COPY.noPlays);
             return;
         }
-        const profile = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
+        const profile = this.heatProfile();
         this.recipe = (0, recipes_1.recipeForRun)(this.meta.runsCompleted);
         this.session = (0, session_1.createSession)({
             recipeId: this.recipe.id,
@@ -252,7 +260,11 @@ class GameApp {
                 this.toast(copy_1.COPY.tossSoon);
             return;
         }
-        const result = (0, session_1.applyToss)(this.session);
+        let result = (0, session_1.applyToss)(this.session);
+        if (!result.ok && result.reason === 'empty' && this.practice) {
+            this.session.charges = Math.max(this.session.maxCharges, 8);
+            result = (0, session_1.applyToss)(this.session);
+        }
         if (!result.ok) {
             if (result.reason === 'empty' && (source === 'button' || !this.toldNoCharge)) {
                 this.toldNoCharge = true;
@@ -269,6 +281,7 @@ class GameApp {
         this.consumeEvents(result.events);
     }
     feed(sample) {
+        this.samplesSeen += 1;
         const event = this.detector.push(sample);
         if (this.detector.isLive() && !this.platform.isDevtools)
             this.sensorPhase = 'live';
@@ -278,16 +291,32 @@ class GameApp {
         }
         if (!event)
             return;
-        this.detectedTosses += 1;
-        console.log('[颠勺] 识别', this.detectedTosses);
+        const now = this.platform.now();
+        if (now - this.lastGyroAt > 2500)
+            this.gyroStreak = 0;
+        this.gyroStreak += 1;
+        this.gyroHits += 1;
+        this.lastGyroAt = now;
+        console.log('[颠勺] 识别', this.gyroHits);
         this.tryToss('gyro');
+    }
+    /** 测试期真机保留手动颠勺，直到传感器连续认出 3 下。 */
+    keepManualToss() {
+        if (this.platform.isDevtools)
+            return true;
+        if (this.practice && this.gyroStreak < 3)
+            return true;
+        return this.sensorPhase !== 'live';
     }
     beginSensors() {
         const gen = ++this.sensorGen;
         this.platform.stopSensors();
         this.mux.reset();
         this.detector = (0, gyro_1.createTossDetector)(this.meta.tier);
-        this.detectedTosses = 0;
+        this.gyroHits = 0;
+        this.gyroStreak = 0;
+        this.lastGyroAt = 0;
+        this.samplesSeen = 0;
         this.loggedLive = false;
         if (this.platform.isDevtools) {
             this.sensorPhase = 'fallback';
@@ -301,26 +330,27 @@ class GameApp {
         this.sensorWaitUntil = Number.POSITIVE_INFINITY;
         void this.openSensors(gen);
     }
-    /** 点「去设置」时直接打开系统权限页，回来再听一次方向。 */
-    askMotionSettings() {
-        void this.platform.openMotionSettings().then(() => {
-            if (this.screen !== 'play' || this.platform.isDevtools)
-                return;
-            void this.openSensors(this.sensorGen);
-        });
+    /** 再听一次方向和加速度。不打开系统设置页。 */
+    retryListen() {
+        if (this.screen !== 'play' || this.platform.isDevtools)
+            return;
+        this.toldFallback = false;
+        this.beginSensors();
     }
     async openSensors(gen) {
         if (this.platform.isDevtools)
             return;
-        const motion = await this.platform.startMotion();
+        const motionPromise = this.platform.startMotion();
+        const accelPromise = this.platform.startAccel();
+        const motion = await motionPromise;
+        const accel = await accelPromise;
         if (gen !== this.sensorGen)
             return;
-        if (motion === 'ok') {
+        if (motion === 'ok' || accel === 'ok') {
             this.armMotionWait();
-            void this.platform.startAccel();
             return;
         }
-        if (motion === 'unsupported') {
+        if (motion === 'unsupported' && accel === 'unsupported') {
             this.markSensorFallback();
             return;
         }
@@ -328,18 +358,22 @@ class GameApp {
         if (gen !== this.sensorGen)
             return;
         if (consent === 'granted') {
-            const again = await this.platform.startMotion();
+            const againMotion = this.platform.startMotion();
+            const againAccel = this.platform.startAccel();
+            const motionAgain = await againMotion;
+            const accelAgain = await againAccel;
             if (gen !== this.sensorGen)
                 return;
-            if (again === 'ok') {
+            if (motionAgain === 'ok' || accelAgain === 'ok') {
                 this.armMotionWait();
-                void this.platform.startAccel();
                 return;
             }
         }
-        this.markSensorNeedAuth();
+        this.markSensorDeaf();
     }
     armMotionWait() {
+        if (this.sensorPhase === 'live')
+            return;
         this.sensorPhase = 'pending';
         this.sensorWaitUntil = this.platform.now() + 1500;
     }
@@ -348,18 +382,18 @@ class GameApp {
             return;
         if (this.platform.now() <= this.sensorWaitUntil)
             return;
-        if (this.detector.isLive()) {
+        if (this.samplesSeen > 0 && this.detector.isLive()) {
             this.sensorPhase = 'live';
             return;
         }
-        this.markSensorNeedAuth();
+        this.markSensorDeaf();
     }
-    markSensorNeedAuth() {
-        this.sensorPhase = 'needAuth';
+    markSensorDeaf() {
+        this.sensorPhase = 'deaf';
         if (this.toldFallback)
             return;
         this.toldFallback = true;
-        this.toast(copy_1.COPY.sensorNeedAuth);
+        this.toast(copy_1.COPY.sensorDeaf);
     }
     markSensorFallback() {
         this.sensorPhase = 'fallback';
@@ -537,8 +571,8 @@ class GameApp {
     sensorLabel() {
         if (this.platform.isDevtools)
             return copy_1.COPY.sensorDevtools;
-        if (this.sensorPhase === 'needAuth')
-            return copy_1.COPY.sensorNeedAuth;
+        if (this.sensorPhase === 'deaf')
+            return copy_1.COPY.sensorDeaf;
         if (this.sensorPhase === 'fallback')
             return copy_1.COPY.sensorFallback;
         if (this.sensorPhase === 'live')

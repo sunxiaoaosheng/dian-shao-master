@@ -147,7 +147,7 @@ function layoutPlay(input, vm) {
         chargesText: (0, copy_1.chargesLabel)(session.charges),
         charges: session.charges,
         maxCharges: session.maxCharges,
-        tossedText: (0, copy_1.tossedLabel)(session.tossCount),
+        tossedText: (0, copy_1.tossedLabel)(Math.max(session.tossCount, input.gyroHits)),
         cooldownText: input.tossWaitMs > 0 ? (0, copy_1.cooldownLabel)(copy_1.TIER_NAME[input.tier], input.tossWaitMs) : '',
         showPerfect: session.cardsThisRun > 0,
         showBurnt: session.meter >= 85,
@@ -173,10 +173,12 @@ function layoutPlay(input, vm) {
     };
     const tossY = input.height - input.safeBottom - 70;
     if (input.motionNeedsSetting) {
-        vm.buttons.push(button('motionSetting', copy_1.COPY.motionSetting, 96, tossY - 44, 108, 34, true, false, false));
+        vm.buttons.push(button('retryListen', copy_1.COPY.retryListen, 96, tossY - 44, 108, 34, true, false, false));
     }
     if (input.showTossButton) {
-        vm.buttons.push(button('toss', copy_1.COPY.toss, input.width - 156, tossY, 140, 46, true, session.charges <= 0, false));
+        const cooling = input.tossWaitMs > 0;
+        const spent = session.charges <= 0 && !input.practiceStart;
+        vm.buttons.push(button('toss', copy_1.COPY.toss, input.width - 156, tossY, 140, 46, true, cooling || spent, false));
     }
     vm.toastY = gy + gridH * 0.42;
 }

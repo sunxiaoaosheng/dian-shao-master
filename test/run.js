@@ -16,7 +16,7 @@ installManifest((filePath, encoding) => {
 
 const { resolveMerges } = require('../dist/core/merge');
 const { createSession, place, tick, applyToss, clearCell } = require('../dist/core/session');
-const { HEAT, pickProfile } = require('../dist/meta/difficulty');
+const { HEAT, pickProfile, practiceProfile } = require('../dist/meta/difficulty');
 const {
   emptyDaily,
   canStart,
@@ -52,6 +52,7 @@ const {
   tossFeelLine,
   tossAck,
   testPlaysHint,
+  tossedLabel,
 } = require('../dist/content/copy');
 const { SHARE_STICKER_ID } = require('../dist/viral/shareCard');
 const { ASSETS, LAYERS, MANIFEST_VERSION, assetById, foodIdForLevel } = require('../dist/content/manifest');
@@ -398,6 +399,41 @@ function testDaily() {
   assert.equal(pickProfile(2).id, 'stir');
   assert.equal(pickProfile(3).id, 'hell');
   assert.equal(pickProfile(8).id, 'hell');
+  const eased = practiceProfile(HEAT[3]);
+  assert.equal(eased.id, 'hell');
+  assert.ok(eased.baseBurnMs >= 18000);
+  assert.ok(eased.tossCharges >= 20);
+  assert.ok(eased.passivePerSec <= 2);
+  const rawHell = createSession({
+    recipeId: 'huiguo',
+    maxLevel: 4,
+    profile: HEAT[3],
+    seed: 1,
+  });
+  let rawSteps = 0;
+  while (rawHell.status === 'playing' && rawSteps < 120) {
+    tick(rawHell, 100);
+    rawSteps += 1;
+  }
+  assert.equal(rawHell.status, 'burnt_out');
+  assert.ok(rawHell.elapsedMs < 12000, `正式地狱火应很快糊，实际 ${rawHell.elapsedMs}`);
+  const practiceHell = createSession({
+    recipeId: 'huiguo',
+    maxLevel: 4,
+    profile: eased,
+    seed: 1,
+  });
+  let practiceSteps = 0;
+  while (practiceHell.status === 'playing' && practiceSteps < 200) {
+    tick(practiceHell, 100);
+    practiceSteps += 1;
+  }
+  assert.equal(practiceHell.status, 'playing', `测试态地狱火 20 秒内不该收锅 ${practiceHell.elapsedMs}`);
+  assert.ok(practiceHell.elapsedMs >= 20000);
+  assert.equal(tossedLabel(0), '已颠 0 下');
+  assert.ok(COPY.sensorDeaf.includes('手动颠勺'));
+  assert.ok(!COPY.sensorDeaf.includes('设置'));
+  assert.equal(COPY.retryListen, '再听一次');
 
   const appSrc = fs.readFileSync(path.join(__dirname, '../src/app.ts'), 'utf8');
   const start = appSrc.slice(appSrc.indexOf('private startRun'), appSrc.indexOf('private goHome'));
@@ -478,6 +514,25 @@ function testGyro() {
   }));
   const rescued = pushAll(createTossDetector('standard'), deadMotion);
   assert.equal(rescued.fires, 1, `方向一直是 0 时加速度仍应认出颠勺 impulse ${rescued.maxI}`);
+
+  const jerk = [];
+  for (let t = 0; t <= 700; t += 20) {
+    jerk.push({ t, alpha: 12, beta: 40, gamma: -6, ax: 0, ay: 0.04, az: 1 });
+  }
+  const spike = [0.2, 0.9, 1.7, 2.2, 1.1, 0.25];
+  for (let i = 0; i < spike.length; i += 1) {
+    jerk.push({
+      t: 820 + i * 20,
+      alpha: 12,
+      beta: 40,
+      gamma: -6,
+      ax: 0.02,
+      ay: spike[i],
+      az: 1,
+    });
+  }
+  const jerked = pushAll(createTossDetector('standard'), jerk);
+  assert.equal(jerked.fires, 1, `转角几乎不变时冲量仍应颠勺 impulse ${jerked.maxI} angle ${jerked.maxA}`);
 }
 
 function pngInfo(buf) {
@@ -707,6 +762,7 @@ function testPaint() {
       nextHeatId: 'simmer',
     },
     tossWaitMs: 0,
+    gyroHits: 0,
     shake: 0.6,
     canSave: true,
     qa: { detected: 2, impulse: 1.8, angle: 30, unit: 'g', phase: 'fallback' },
@@ -744,19 +800,47 @@ function testPaint() {
   const needAuth = composeView(Object.assign({}, base, {
     screen: 'play',
     motionNeedsSetting: true,
-    sensorLabel: COPY.sensorNeedAuth,
+    sensorLabel: COPY.sensorDeaf,
   }));
-  assert.equal(needAuth.sensorLabel, '需要运动与方向权限才能颠勺');
-  assert.ok(needAuth.buttons.some((button) => button.id === 'motionSetting' && button.label === '去设置'));
+  assert.equal(needAuth.sensorLabel, '没收到晃动数据，先用手动颠勺');
+  assert.ok(needAuth.buttons.some((button) => button.id === 'retryListen' && button.label === '再听一次'));
+  assert.ok(!needAuth.buttons.some((button) => button.label.indexOf('去设置') >= 0));
   assert.ok(needAuth.buttons.some((button) => button.id === 'toss'));
   const devtools = composeView(Object.assign({}, base, { screen: 'play', motionNeedsSetting: false }));
-  assert.ok(!devtools.buttons.some((button) => button.id === 'motionSetting'));
+  assert.ok(!devtools.buttons.some((button) => button.id === 'retryListen'));
 
-  const cooling = composeView(Object.assign({}, base, { screen: 'play', tossWaitMs: 600 }));
+  const cooling = composeView(Object.assign({}, base, { screen: 'play', tossWaitMs: 600, practiceStart: true }));
   assert.ok(cooling.play.cooldownText.includes('0.6'));
   assert.equal(cooldownLabel('家常', 600), cooling.play.cooldownText);
+  assert.equal(cooling.buttons.find((button) => button.id === 'toss').disabled, true);
+  const readyAgain = composeView(Object.assign({}, base, { screen: 'play', tossWaitMs: 0, practiceStart: true }));
+  assert.equal(readyAgain.buttons.find((button) => button.id === 'toss').disabled, false);
+  const spent = createSession({
+    recipeId: recipe.id,
+    maxLevel: recipe.levels.length,
+    profile: HEAT[3],
+    seed: 4,
+  });
+  spent.charges = 0;
+  const practiceSpent = composeView(Object.assign({}, base, {
+    screen: 'play',
+    tossWaitMs: 0,
+    practiceStart: true,
+    session: spent,
+    gyroHits: 2,
+  }));
+  assert.equal(practiceSpent.buttons.find((button) => button.id === 'toss').disabled, false);
+  assert.equal(practiceSpent.play.tossedText, '已颠 2 下');
+  const productSpent = composeView(Object.assign({}, base, {
+    screen: 'play',
+    tossWaitMs: 0,
+    practiceStart: false,
+    session: spent,
+  }));
+  assert.equal(productSpent.buttons.find((button) => button.id === 'toss').disabled, true);
 
   const playing = composeView(Object.assign({}, base, { screen: 'play' }));
+  assert.equal(playing.play.tossedText, '已颠 0 下');
   assert.equal(playing.play.mergeRule, COPY.hint);
   assert.ok(playing.play.goalText.includes('出师'));
   assert.ok(playing.play.goalText.includes('下一火'));
@@ -877,13 +961,17 @@ function testMotionAuth() {
   assert.equal(MOTION_SCOPE, 'scope.accelerometer');
   assert.ok(MOTION_START_MS >= 5000);
   const appSrc = fs.readFileSync(path.join(__dirname, '../src/app.ts'), 'utf8');
-  const begin = appSrc.slice(appSrc.indexOf('private beginSensors'), appSrc.indexOf('private askMotionSettings'));
+  const begin = appSrc.slice(appSrc.indexOf('private beginSensors'), appSrc.indexOf('private retryListen'));
   assert.ok(begin.includes('isDevtools'));
   assert.ok(begin.indexOf('isDevtools') < begin.indexOf('openSensors'));
   const open = appSrc.slice(appSrc.indexOf('private async openSensors'), appSrc.indexOf('private armMotionWait'));
   assert.ok(open.includes('startMotion('));
+  assert.ok(open.includes('startAccel('));
   assert.ok(open.includes('requestMotionConsent'));
   assert.ok(open.indexOf('startMotion') < open.indexOf('startAccel'));
+  assert.ok(!appSrc.includes('openMotionSettings'));
+  assert.ok(appSrc.includes('practiceProfile'));
+  assert.ok(!fs.readFileSync(path.join(__dirname, '../src/content/copy.ts'), 'utf8').includes('去设置'));
   const motionSrc = fs.readFileSync(path.join(__dirname, '../src/platform/wechat/motion.ts'), 'utf8');
   assert.ok(motionSrc.includes('startDeviceMotionListening'));
 
@@ -943,6 +1031,49 @@ function testMotionAuth() {
     }).then(() => {
       assert.equal(opened, 'app');
     });
+  });
+}
+
+function testMotionBridge() {
+  const { createMotionBridge } = require('../dist/platform/wechat/motion');
+  const motionSamples = [];
+  const accelSamples = [];
+  const starts = [];
+  const wx = {
+    startDeviceMotionListening(opts) {
+      starts.push(opts.interval);
+      if (opts.interval === 'game') opts.fail({ errMsg: 'game unsupported' });
+      else opts.success();
+    },
+    onDeviceMotionChange(cb) {
+      cb({ alpha: '12.5', beta: 30, gamma: 0, y: '1.25' });
+    },
+    offDeviceMotionChange() {},
+    stopDeviceMotionListening() {},
+    startAccelerometer(opts) {
+      opts.success();
+    },
+    onAccelerometerChange(cb) {
+      cb({ x: '0', y: 0.2, z: 9.8 });
+    },
+    offAccelerometerChange() {},
+    stopAccelerometer() {},
+  };
+  const bridge = createMotionBridge(wx);
+  bridge.sink.motion = (sample) => motionSamples.push(sample);
+  bridge.sink.accel = (sample) => accelSamples.push(sample);
+  return bridge.startMotion().then((motion) => {
+    assert.equal(motion, 'ok');
+    assert.deepEqual(starts, ['game', 'ui']);
+    assert.equal(motionSamples[0].alpha, 12.5);
+    assert.equal(motionSamples[0].gamma, 0);
+    assert.equal(accelSamples[0].y, 1.25);
+    return bridge.startAccel();
+  }).then((accel) => {
+    assert.equal(accel, 'ok');
+    const last = accelSamples[accelSamples.length - 1];
+    assert.equal(last.x, 0);
+    assert.equal(last.z, 9.8);
   });
 }
 
@@ -1075,7 +1206,7 @@ testWords();
 testPaint();
 testFeel();
 testBoot();
-testMotionAuth().then(() => testHooks()).then(() => {
+testMotionAuth().then(() => testMotionBridge()).then(() => testHooks()).then(() => {
   console.log('颠勺王测试通过');
 }).catch((err) => {
   console.error(err);

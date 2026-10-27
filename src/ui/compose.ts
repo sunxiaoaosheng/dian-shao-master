@@ -76,6 +76,8 @@ export interface ComposeInput {
   } | null;
   /** 颠勺手感冷却还剩的毫秒。0 表示这下可以颠。 */
   tossWaitMs: number;
+  /** 传感器认出的次数。画面上的「已颠」取它和局里次数里更大的那个。 */
+  gyroHits: number;
   shake: number;
   canSave: boolean;
   qa: { detected: number; impulse: number; angle: number; unit: string; phase: string } | null;
@@ -221,7 +223,7 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
     chargesText: chargesLabel(session.charges),
     charges: session.charges,
     maxCharges: session.maxCharges,
-    tossedText: tossedLabel(session.tossCount),
+    tossedText: tossedLabel(Math.max(session.tossCount, input.gyroHits)),
     cooldownText: input.tossWaitMs > 0 ? cooldownLabel(TIER_NAME[input.tier], input.tossWaitMs) : '',
     showPerfect: session.cardsThisRun > 0,
     showBurnt: session.meter >= 85,
@@ -247,9 +249,11 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
   };
   const tossY = input.height - input.safeBottom - 70;
   if (input.motionNeedsSetting) {
-    vm.buttons.push(button('motionSetting', COPY.motionSetting, 96, tossY - 44, 108, 34, true, false, false));
+    vm.buttons.push(button('retryListen', COPY.retryListen, 96, tossY - 44, 108, 34, true, false, false));
   }
   if (input.showTossButton) {
+    const cooling = input.tossWaitMs > 0;
+    const spent = session.charges <= 0 && !input.practiceStart;
     vm.buttons.push(button(
       'toss',
       COPY.toss,
@@ -258,7 +262,7 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
       140,
       46,
       true,
-      session.charges <= 0,
+      cooling || spent,
       false,
     ));
   }

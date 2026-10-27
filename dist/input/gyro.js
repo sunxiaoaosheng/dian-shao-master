@@ -5,6 +5,7 @@
  * 真机验收（默认「家常」档）看 README：
  * - 静置不得误触发
  * - 故意上颠 10 次，至少认出 8 次
+ * 向上一甩主要是冲量。冲量够了就认，转角不够不能把这一下否掉。
  *
  * 冷却落在 0.4–0.8 秒：越灵敏的档，冷却越长，避免一下颠被算成两下。
  * 加速度单位会在开局校准里自判：静止模长约 1 当 g，约 9.8 当 m/s²。
@@ -22,9 +23,9 @@ exports.CALIBRATION_MS = 360;
 exports.COOLDOWN_MIN_MS = 400;
 exports.COOLDOWN_MAX_MS = 800;
 exports.TIERS = {
-    gentle: { id: 'gentle', accelG: 1.12, angleDeg: 14, cooldownMs: 800 },
-    standard: { id: 'standard', accelG: 1.55, angleDeg: 18, cooldownMs: 600 },
-    fierce: { id: 'fierce', accelG: 2.05, angleDeg: 24, cooldownMs: 400 },
+    gentle: { id: 'gentle', accelG: 0.72, angleDeg: 10, cooldownMs: 800 },
+    standard: { id: 'standard', accelG: 0.9, angleDeg: 12, cooldownMs: 600 },
+    fierce: { id: 'fierce', accelG: 1.52, angleDeg: 16, cooldownMs: 400 },
 };
 const GRAVITY_TAU_S = 0.4;
 const RELAX_ACCEL_G = 0.45;
@@ -164,9 +165,11 @@ class TossDetector {
         if (sample.t < this.cooldownUntil)
             return null;
         if (!this.armed) {
-            if (mag < RELAX_ACCEL_G && angle < RELAX_ANGLE)
+            const rested = mag < RELAX_ACCEL_G && angle < RELAX_ANGLE;
+            if (rested || sample.t >= this.cooldownUntil + 180)
                 this.armed = true;
-            return null;
+            if (!this.armed || !rested)
+                return null;
         }
         if (!this.matches(this.lastImpulse, angle))
             return null;
@@ -199,13 +202,10 @@ class TossDetector {
         const accelNeed = this.tier.accelG;
         const angleNeed = this.tier.angleDeg;
         const motionUsable = this.seenMotion && this.motionNonZero;
-        if (motionUsable && this.seenAccel) {
-            return impulse >= accelNeed && angle >= angleNeed;
-        }
-        if (this.seenAccel)
-            return impulse >= accelNeed * 1.25;
-        if (motionUsable)
-            return angle >= angleNeed * 1.35;
+        if (this.seenAccel && impulse >= accelNeed)
+            return true;
+        if (!this.seenAccel && motionUsable && angle >= angleNeed)
+            return true;
         return false;
     }
     pushMag(t, mag) {

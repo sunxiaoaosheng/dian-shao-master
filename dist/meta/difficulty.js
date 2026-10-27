@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.HEAT = exports.GRADUATION_MS = exports.GRADUATION_MERGES = void 0;
 exports.didGraduate = didGraduate;
 exports.pickProfile = pickProfile;
+exports.practiceProfile = practiceProfile;
 /** 试火出师：合成够次数，或这口撑过这么久，或收了招牌。否则下一锅仍是试火。 */
 exports.GRADUATION_MERGES = 1;
 exports.GRADUATION_MS = 20000;
@@ -91,4 +92,27 @@ function pickProfile(runsCompleted) {
     if (runsCompleted === 2)
         return exports.HEAT[2];
     return exports.HEAT[3];
+}
+/**
+ * 测试号和开发者工具用来验颠勺。
+ * 正式档的地狱火几秒就糊，而且只有 1 次颠勺，真机还没甩起来锅已经收了。
+ */
+function practiceProfile(profile) {
+    return {
+        id: profile.id,
+        spawnIntervalMs: Math.max(profile.spawnIntervalMs, 2200),
+        spawnFloor: Math.max(profile.spawnFloor, 1600),
+        baseBurnMs: Math.max(profile.baseBurnMs, 18000),
+        burnPerLevelMs: Math.max(profile.burnPerLevelMs, 5000),
+        passivePerSec: Math.min(profile.passivePerSec, 2),
+        burnChunk: Math.min(profile.burnChunk, 6),
+        tossCharges: Math.max(profile.tossCharges, 20),
+        tossRelief: Math.max(profile.tossRelief, 28),
+        cols: profile.cols,
+        rows: profile.rows,
+        heatRampEvery: 0,
+        level2Chance: 0,
+        hint: profile.hint,
+        cookScale: 1,
+    };
 }

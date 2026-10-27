@@ -108,3 +108,27 @@ export function pickProfile(runsCompleted: number): HeatProfile {
   if (runsCompleted === 2) return HEAT[2];
   return HEAT[3];
 }
+
+/**
+ * 测试号和开发者工具用来验颠勺。
+ * 正式档的地狱火几秒就糊，而且只有 1 次颠勺，真机还没甩起来锅已经收了。
+ */
+export function practiceProfile(profile: HeatProfile): HeatProfile {
+  return {
+    id: profile.id,
+    spawnIntervalMs: Math.max(profile.spawnIntervalMs, 2200),
+    spawnFloor: Math.max(profile.spawnFloor, 1600),
+    baseBurnMs: Math.max(profile.baseBurnMs, 18000),
+    burnPerLevelMs: Math.max(profile.burnPerLevelMs, 5000),
+    passivePerSec: Math.min(profile.passivePerSec, 2),
+    burnChunk: Math.min(profile.burnChunk, 6),
+    tossCharges: Math.max(profile.tossCharges, 20),
+    tossRelief: Math.max(profile.tossRelief, 28),
+    cols: profile.cols,
+    rows: profile.rows,
+    heatRampEvery: 0,
+    level2Chance: 0,
+    hint: profile.hint,
+    cookScale: 1,
+  };
+}

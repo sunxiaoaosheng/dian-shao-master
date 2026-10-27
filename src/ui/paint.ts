@@ -201,14 +201,17 @@ function paintPlayText(ctx: Ctx, vm: ViewModel): void {
   ctx.fillStyle = PALETTE.ink;
   if (spriteReady('ui.scoreChip')) ctx.fillText(play.scoreText, vm.width - 60, 14);
   else ctx.fillText(play.scoreText, vm.width - 16, 16);
-  ctx.font = font(12, false);
+  ctx.font = font(16, true);
+  ctx.fillStyle = PALETTE.chiliDeep;
+  ctx.fillText(play.tossedText, vm.width - 16, 38);
+  ctx.font = font(11, false);
   ctx.fillStyle = PALETTE.inkSoft;
-  ctx.fillText(play.chargesText, vm.width - 16, 40);
+  ctx.fillText(play.chargesText, vm.width - 16, 58);
   const feelLine = play.cooldownText || play.feelText;
   if (feelLine) {
     ctx.font = font(11, false);
     ctx.fillStyle = play.cooldownText ? PALETTE.chiliDeep : PALETTE.inkSoft;
-    ctx.fillText(feelLine, vm.width - 16, 54);
+    ctx.fillText(feelLine, vm.width - 16, 72);
   }
 
   if (!spriteReady('ui.progressTrack') || !spriteReady('ui.progressFill')) {
@@ -272,8 +275,9 @@ function paintPlayText(ctx: Ctx, vm: ViewModel): void {
   const noteX = play.nextBox.x + play.nextBox.w + 8;
   const noteW = play.showTossButton ? vm.width - noteX - 160 : vm.width - noteX - 16;
   drawWrapped(ctx, note, noteX, play.nextBox.y, Math.max(80, noteW), 16);
-  ctx.fillStyle = PALETTE.inkSoft;
-  ctx.fillText(play.tossedText, noteX, play.nextBox.y + 36);
+  ctx.fillStyle = PALETTE.chiliDeep;
+  ctx.font = font(16, true);
+  ctx.fillText(play.tossedText, noteX, play.nextBox.y + 34);
   if (play.goalText) {
     ctx.fillStyle = PALETTE.ink;
     ctx.font = font(12, true);

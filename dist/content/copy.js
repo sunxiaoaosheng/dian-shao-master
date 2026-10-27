@@ -44,8 +44,8 @@ exports.COPY = {
     hint: '点空位下锅。上下左右同级、还没糊的，并成下一味。斜着不算。',
     sensorLive: '握紧手机，向上颠一下',
     sensorFallback: '这台设备听不到晃动，用手动颠勺',
-    sensorNeedAuth: '需要运动与方向权限才能颠勺',
-    motionSetting: '去设置',
+    sensorDeaf: '没收到晃动数据，先用手动颠勺',
+    retryListen: '再听一次',
     sensorDevtools: '模拟器没有真陀螺仪，先手动颠',
     sensorPending: '正在听锅的晃动…',
     tossSoon: '勺还在空中',
@@ -172,7 +172,7 @@ function chargesLabel(n) {
     return `还能颠 ${n} 下`;
 }
 function tossedLabel(n) {
-    return `这锅颠了 ${n} 下`;
+    return `已颠 ${n} 下`;
 }
 function roundRecap(seconds, merges, tosses) {
     return `这口 ${seconds} 秒，合成 ${merges} 次，颠了 ${tosses} 下`;

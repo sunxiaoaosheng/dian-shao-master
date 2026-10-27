@@ -199,14 +199,17 @@ function paintPlayText(ctx, vm) {
         ctx.fillText(play.scoreText, vm.width - 60, 14);
     else
         ctx.fillText(play.scoreText, vm.width - 16, 16);
-    ctx.font = (0, theme_1.font)(12, false);
+    ctx.font = (0, theme_1.font)(16, true);
+    ctx.fillStyle = theme_1.PALETTE.chiliDeep;
+    ctx.fillText(play.tossedText, vm.width - 16, 38);
+    ctx.font = (0, theme_1.font)(11, false);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
-    ctx.fillText(play.chargesText, vm.width - 16, 40);
+    ctx.fillText(play.chargesText, vm.width - 16, 58);
     const feelLine = play.cooldownText || play.feelText;
     if (feelLine) {
         ctx.font = (0, theme_1.font)(11, false);
         ctx.fillStyle = play.cooldownText ? theme_1.PALETTE.chiliDeep : theme_1.PALETTE.inkSoft;
-        ctx.fillText(feelLine, vm.width - 16, 54);
+        ctx.fillText(feelLine, vm.width - 16, 72);
     }
     if (!(0, sprites_1.spriteReady)('ui.progressTrack') || !(0, sprites_1.spriteReady)('ui.progressFill')) {
         (0, draw_1.drawMeter)(ctx, 16, 64, vm.width - 32, 12, play.meter);
@@ -255,8 +258,9 @@ function paintPlayText(ctx, vm) {
     const noteX = play.nextBox.x + play.nextBox.w + 8;
     const noteW = play.showTossButton ? vm.width - noteX - 160 : vm.width - noteX - 16;
     (0, draw_1.drawWrapped)(ctx, note, noteX, play.nextBox.y, Math.max(80, noteW), 16);
-    ctx.fillStyle = theme_1.PALETTE.inkSoft;
-    ctx.fillText(play.tossedText, noteX, play.nextBox.y + 36);
+    ctx.fillStyle = theme_1.PALETTE.chiliDeep;
+    ctx.font = (0, theme_1.font)(16, true);
+    ctx.fillText(play.tossedText, noteX, play.nextBox.y + 34);
     if (play.goalText) {
         ctx.fillStyle = theme_1.PALETTE.ink;
         ctx.font = (0, theme_1.font)(12, true);

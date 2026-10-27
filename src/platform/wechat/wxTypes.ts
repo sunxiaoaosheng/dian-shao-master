@@ -58,12 +58,12 @@ export interface WechatMiniGame {
   openSetting?(opts: { success?: () => void; fail?: () => void }): void;
   openAppAuthorizeSetting?(opts: { success?: () => void; fail?: () => void }): void;
   stopDeviceMotionListening?(opts?: { success?: () => void; fail?: () => void }): void;
-  onDeviceMotionChange?(cb: (res: { alpha?: number; beta?: number; gamma?: number }) => void): void;
-  offDeviceMotionChange?(cb: (res: { alpha?: number; beta?: number; gamma?: number }) => void): void;
+  onDeviceMotionChange?(cb: (res: { alpha?: unknown; beta?: unknown; gamma?: unknown; x?: unknown; y?: unknown; z?: unknown }) => void): void;
+  offDeviceMotionChange?(cb: (res: { alpha?: unknown; beta?: unknown; gamma?: unknown; x?: unknown; y?: unknown; z?: unknown }) => void): void;
   startAccelerometer?(opts: WxListenOpts): void;
   stopAccelerometer?(opts?: { success?: () => void; fail?: () => void }): void;
-  onAccelerometerChange?(cb: (res: { x?: number; y?: number; z?: number }) => void): void;
-  offAccelerometerChange?(cb: (res: { x?: number; y?: number; z?: number }) => void): void;
+  onAccelerometerChange?(cb: (res: { x?: unknown; y?: unknown; z?: unknown }) => void): void;
+  offAccelerometerChange?(cb: (res: { x?: unknown; y?: unknown; z?: unknown }) => void): void;
   shareAppMessage?(opts: {
     title?: string;
     imageUrl?: string;
