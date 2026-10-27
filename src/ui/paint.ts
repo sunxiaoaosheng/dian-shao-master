@@ -1,4 +1,4 @@
-import { FOOD, FX, TYPE, UI, foodForLevel } from '../content/collage';
+import { foodIdForLevel, assetById } from '../content/manifest';
 import { COPY } from '../content/copy';
 import { toastImageFor } from '../content/toasts';
 import type { Ctx } from './ctx';
@@ -13,7 +13,7 @@ import {
   fillTorn,
   paintPaper,
 } from './draw';
-import { drawSprite } from './sprites';
+import { beginSprites, flushSprites, queueBox, spriteReady } from './sprites';
 import { PALETTE, font } from './theme';
 import type { ViewModel } from './types';
 
@@ -23,24 +23,43 @@ export function paint(ctx: Ctx, vm: ViewModel): void {
     const mag = vm.shake * 8;
     ctx.translate(Math.sin(vm.now / 28) * mag, Math.cos(vm.now / 22) * mag * 0.65);
   }
-  if (!drawSprite(ctx, UI.paperBg, 0, 0, vm.width, vm.height)) paintPaper(ctx, vm.width, vm.height);
-  if (vm.screen === 'home') paintHome(ctx, vm);
-  else if (vm.screen === 'play') paintPlay(ctx, vm);
+  beginSprites();
+  queueBox('ui.paperBg', 0, 0, vm.width, vm.height, {
+    fallback: (paperCtx) => paintPaper(paperCtx, vm.width, vm.height),
+  });
+  if (vm.screen === 'home') queueHome(vm);
+  else if (vm.screen === 'play') queuePlay(vm);
+  else queueButtons(vm);
+  queueToasts(vm);
+  flushSprites(ctx);
+  if (vm.screen === 'home') paintHomeText(ctx, vm);
+  else if (vm.screen === 'play') paintPlayText(ctx, vm);
   else if (vm.screen === 'result') paintResult(ctx, vm);
   else paintAlbum(ctx, vm);
-  paintToasts(ctx, vm);
+  if (vm.screen !== 'home') paintButtonLabels(ctx, vm);
+  paintToastText(ctx, vm);
   if (vm.qaLines.length) paintQa(ctx, vm);
   ctx.restore();
 }
 
-function paintHome(ctx: Ctx, vm: ViewModel): void {
+function queueHome(vm: ViewModel): void {
   const cardY = vm.seal ? vm.seal.y : 16;
   const cardW = vm.width - 112;
   const cardH = 118;
+  queueBox('ui.panelTorn', 0, 0, cardW, cardH, {
+    tx: 16,
+    ty: cardY,
+    fallback: (panelCtx) => fillTorn(panelCtx, cardW, cardH, 11, PALETTE.white, 0.04),
+  });
+  queueBox('ui.tapeStrip', 18, -8, 78, 22, { tx: 16, ty: cardY });
+  queueButtons(vm);
+}
+
+function paintHomeText(ctx: Ctx, vm: ViewModel): void {
+  const cardY = vm.seal ? vm.seal.y : 16;
+  const cardW = vm.width - 112;
   ctx.save();
   ctx.translate(16, cardY);
-  if (!drawSprite(ctx, UI.panelTorn, 0, 0, cardW, cardH)) fillTorn(ctx, cardW, cardH, 11, PALETTE.white, 0.04);
-  drawSprite(ctx, UI.tapeStrip, 18, -8, 78, 22);
   ctx.fillStyle = PALETTE.ink;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -65,11 +84,11 @@ function paintHome(ctx: Ctx, vm: ViewModel): void {
     ctx.fillText(`${COPY.tierTitle} · 下锅是${vm.heatLabel}`, 20, tierButton.y - 18);
   }
 
-  paintButtons(ctx, vm);
+  paintButtonLabels(ctx, vm);
   ctx.fillStyle = PALETTE.inkSoft;
   ctx.font = font(12, false);
   ctx.textAlign = 'left';
-  const hintY = tierButton ? tierButton.y + 42 : cardY + cardH + 8;
+  const hintY = tierButton ? tierButton.y + 42 : cardY + 118 + 8;
   drawWrapped(ctx, vm.playsHint, 20, hintY, vm.width - 40, 16);
 
   if (vm.showBoard) {
@@ -88,7 +107,72 @@ function paintHome(ctx: Ctx, vm: ViewModel): void {
   }
 }
 
-function paintPlay(ctx: Ctx, vm: ViewModel): void {
+function queuePlay(vm: ViewModel): void {
+  const play = vm.play;
+  if (!play) return;
+  const wokX = play.wok.x;
+  const wokY = play.wok.y + play.wok.h * 0.35;
+  const wokW = play.wok.w;
+  const wokH = play.wok.h * 0.55;
+  queueBox('food.wokHandle', wokX - 18, play.wok.y + play.wok.h * 0.2, 28, 72);
+  queueBox('food.wokBase', wokX, wokY, wokW, wokH, {
+    fallback: (wokCtx) => drawWok(wokCtx, play.wok.x, play.wok.y, play.wok.w, play.wok.h),
+  });
+  queueBox('food.oilSheen', play.wok.x + play.wok.w * 0.18, play.wok.y + play.wok.h * 0.42, play.wok.w * 0.64, play.wok.h * 0.28);
+  if (play.meter > 0.72) queueBox('fx.flameLick', vm.width - 48, 48, 28, 42);
+
+  for (let i = 0; i < play.cells.length; i += 1) {
+    const cell = play.cells[i];
+    if (cell.level <= 0) continue;
+    const foodId = foodIdForLevel(cell.level, cell.seed);
+    queueBox(foodId, cell.x + 4, cell.y + 4, cell.w - 8, cell.h - 22, {
+      fallback: (foodCtx) => {
+        drawPolaroid(foodCtx, cell.x, cell.y, cell.w, cell.h, cell.seed, cell.level, cell.ink, cell.name, cell.burnt, cell.cook);
+      },
+    });
+    if (spriteReady(foodId) && cell.level >= 2) {
+      queueBox('food.scallion', cell.x + cell.w - 18, cell.y + 2, 16, 10);
+    }
+    if (spriteReady(foodId) && cell.burnt) {
+      queueBox('fx.smokePuff', cell.x, cell.y, cell.w, cell.h * 0.7);
+      queueBox('fx.missDrip', cell.x + cell.w * 0.35, cell.y + cell.h * 0.4, 14, 22);
+    }
+  }
+
+  if (spriteReady('ui.progressTrack') && spriteReady('ui.progressFill')) {
+    const x = 16;
+    const y = 64;
+    const w = vm.width - 32;
+    const h = 12;
+    const clamped = play.meter < 0 ? 0 : play.meter > 1 ? 1 : play.meter;
+    queueBox('ui.progressTrack', x, y, w, h);
+    queueBox('ui.progressFill', x, y, w, h, {
+      clip: { x, y, w: Math.max(0, w * clamped), h },
+    });
+  }
+  queueBox('ui.scoreChip', vm.width - 104, 8, 88, 30);
+  queueHearts(vm.width - 16, 56, play.charges, play.maxCharges);
+
+  if (vm.shake > 0.2) {
+    const scraps = ['fx.paperScrap.1', 'fx.paperScrap.2', 'fx.paperScrap.3'];
+    const stars = ['fx.oilStar.1', 'fx.oilStar.2', 'fx.oilStar.3', 'fx.oilStar.4'];
+    const cx = play.wok.x + play.wok.w / 2;
+    const cy = play.wok.y + play.wok.h * 0.35;
+    const alpha = Math.max(0.35, vm.shake);
+    for (let i = 0; i < scraps.length; i += 1) {
+      queueBox(scraps[i], cx - 70 + i * 36, cy - 28 - i * 10, 22, 22, { alpha });
+    }
+    for (let i = 0; i < stars.length; i += 1) {
+      queueBox(stars[i], cx - 40 + (i % 2) * 48, cy - 10 - i * 8, 16, 16, { alpha });
+    }
+    if (vm.shake > 0.65) queueBox('fx.perfectBurst', cx - 48, cy - 48, 96, 96, { alpha });
+  }
+  if (play.showPerfect) queueBox('type.perfect', play.wok.x + play.wok.w - 54, play.wok.y, 48, 28);
+  if (play.showBurnt) queueBox('type.burnt', play.wok.x + 8, play.wok.y, 48, 28);
+  queueButtons(vm);
+}
+
+function paintPlayText(ctx: Ctx, vm: ViewModel): void {
   const play = vm.play;
   if (!play) return;
   ctx.fillStyle = PALETTE.ink;
@@ -101,35 +185,21 @@ function paintPlay(ctx: Ctx, vm: ViewModel): void {
   ctx.fillText(`${play.region} · ${vm.heatLabel}`, 16, 40);
   ctx.textAlign = 'right';
   ctx.font = font(16, true);
-  if (drawSprite(ctx, UI.scoreChip, vm.width - 104, 8, 88, 30)) {
-    ctx.fillStyle = PALETTE.ink;
-    ctx.fillText(play.scoreText, vm.width - 60, 14);
-  } else {
-    ctx.fillStyle = PALETTE.ink;
-    ctx.fillText(play.scoreText, vm.width - 16, 16);
-  }
+  ctx.fillStyle = PALETTE.ink;
+  if (spriteReady('ui.scoreChip')) ctx.fillText(play.scoreText, vm.width - 60, 14);
+  else ctx.fillText(play.scoreText, vm.width - 16, 16);
   ctx.font = font(12, false);
   ctx.fillStyle = PALETTE.inkSoft;
   ctx.fillText(play.chargesText, vm.width - 16, 40);
-  paintHearts(ctx, vm.width - 16, 56, play.charges, play.maxCharges);
 
-  if (!paintMeter(ctx, 16, 64, vm.width - 32, 12, play.meter)) {
+  if (!spriteReady('ui.progressTrack') || !spriteReady('ui.progressFill')) {
     drawMeter(ctx, 16, 64, vm.width - 32, 12, play.meter);
   }
   ctx.fillStyle = PALETTE.inkSoft;
   ctx.textAlign = 'left';
   ctx.font = font(11, true);
   ctx.fillText(COPY.meter, 16, 50);
-
-  if (!drawSprite(ctx, FOOD.wokBase, play.wok.x, play.wok.y + play.wok.h * 0.35, play.wok.w, play.wok.h * 0.55)) {
-    drawWok(ctx, play.wok.x, play.wok.y, play.wok.w, play.wok.h);
-  }
-  drawSprite(ctx, FOOD.oilSheen, play.wok.x + play.wok.w * 0.18, play.wok.y + play.wok.h * 0.42, play.wok.w * 0.64, play.wok.h * 0.28);
-  drawSprite(ctx, FOOD.wokHandle, play.wok.x - 18, play.wok.y + play.wok.h * 0.2, 28, 72);
   drawSteam(ctx, play.wok.x + play.wok.w / 2, play.wok.y + 6, vm.now);
-  if (play.meter > 0.72) {
-    drawSprite(ctx, FX.flameLick, vm.width - 48, 48, 28, 42);
-  }
 
   for (let i = 0; i < play.cells.length; i += 1) {
     const cell = play.cells[i];
@@ -143,21 +213,12 @@ function paintPlay(ctx: Ctx, vm: ViewModel): void {
       ctx.restore();
       continue;
     }
-    const food = foodForLevel(cell.level, cell.seed);
-    if (!drawSprite(ctx, food, cell.x + 4, cell.y + 4, cell.w - 8, cell.h - 22)) {
-      drawPolaroid(ctx, cell.x, cell.y, cell.w, cell.h, cell.seed, cell.level, cell.ink, cell.name, cell.burnt, cell.cook);
-    } else {
-      ctx.fillStyle = PALETTE.ink;
-      ctx.font = font(11, true);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(cell.name, cell.x + cell.w / 2, cell.y + cell.h - 1);
-      if (cell.level >= 2) drawSprite(ctx, FOOD.scallion, cell.x + cell.w - 18, cell.y + 2, 16, 10);
-      if (cell.burnt) {
-        drawSprite(ctx, FX.smokePuff, cell.x, cell.y, cell.w, cell.h * 0.7);
-        drawSprite(ctx, FX.missDrip, cell.x + cell.w * 0.35, cell.y + cell.h * 0.4, 14, 22);
-      }
-    }
+    if (!spriteReady(foodIdForLevel(cell.level, cell.seed))) continue;
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = font(11, true);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(cell.name, cell.x + cell.w / 2, cell.y + cell.h - 1);
   }
 
   drawPolaroid(
@@ -190,20 +251,8 @@ function paintPlay(ctx: Ctx, vm: ViewModel): void {
   ctx.fillText(play.tossedText, noteX, play.nextBox.y + 36);
 
   if (vm.shake > 0.2) {
-    const scraps = [FX.scrap01, FX.scrap02, FX.scrap03];
-    const stars = [FX.star01, FX.star02, FX.star03, FX.star04];
     const cx = play.wok.x + play.wok.w / 2;
     const cy = play.wok.y + play.wok.h * 0.35;
-    ctx.save();
-    ctx.globalAlpha = Math.max(0.35, vm.shake);
-    for (let i = 0; i < scraps.length; i += 1) {
-      drawSprite(ctx, scraps[i], cx - 70 + i * 36, cy - 28 - i * 10, 22, 22);
-    }
-    for (let i = 0; i < stars.length; i += 1) {
-      drawSprite(ctx, stars[i], cx - 40 + (i % 2) * 48, cy - 10 - i * 8, 16, 16);
-    }
-    if (vm.shake > 0.65) drawSprite(ctx, FX.perfectBurst, cx - 48, cy - 48, 96, 96);
-    ctx.restore();
     ctx.save();
     ctx.globalAlpha = vm.shake * 0.8;
     ctx.strokeStyle = PALETTE.white;
@@ -218,14 +267,19 @@ function paintPlay(ctx: Ctx, vm: ViewModel): void {
     }
     ctx.restore();
   }
-  if (play.showPerfect) {
-    drawSprite(ctx, TYPE.perfect, play.wok.x + play.wok.w - 54, play.wok.y, 48, 28);
-  }
-  if (play.showBurnt) {
-    drawSprite(ctx, TYPE.burnt, play.wok.x + 8, play.wok.y, 48, 28);
-  }
+  paintStamp(ctx, 'type.perfect', play.showPerfect, play.wok.x + play.wok.w - 54, play.wok.y, 48, 28);
+  paintStamp(ctx, 'type.burnt', play.showBurnt, play.wok.x + 8, play.wok.y, 48, 28);
+}
 
-  paintButtons(ctx, vm);
+function paintStamp(ctx: Ctx, id: string, show: boolean, x: number, y: number, w: number, h: number): void {
+  if (!show || !spriteReady(id)) return;
+  const text = assetById(id).text;
+  if (!text) return;
+  ctx.fillStyle = PALETTE.chiliDeep;
+  ctx.font = font(12, true);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x + w / 2, y + h / 2);
 }
 
 function paintResult(ctx: Ctx, vm: ViewModel): void {
@@ -246,7 +300,6 @@ function paintResult(ctx: Ctx, vm: ViewModel): void {
   ctx.fillStyle = PALETTE.inkSoft;
   drawWrapped(ctx, result.body, 18, 96, vm.width - 78, 22);
   ctx.restore();
-  paintButtons(ctx, vm);
 }
 
 function paintAlbum(ctx: Ctx, vm: ViewModel): void {
@@ -276,17 +329,26 @@ function paintAlbum(ctx: Ctx, vm: ViewModel): void {
     ctx.textAlign = 'left';
     ctx.fillText(`${card.region} · ${card.blurb}`, card.x, card.y + card.h - 16);
   }
-  paintButtons(ctx, vm);
 }
 
-function paintButtons(ctx: Ctx, vm: ViewModel): void {
+function queueButtons(vm: ViewModel): void {
   for (let i = 0; i < vm.buttons.length; i += 1) {
     const button = vm.buttons[i];
-    const plate = button.primary ? UI.btnPrimary : UI.btnGhost;
-    if (!drawSprite(ctx, plate, button.x, button.y, button.w, button.h)) {
-      drawButton(ctx, button.x, button.y, button.w, button.h, button.label, button.primary, button.disabled, button.selected);
-      continue;
-    }
+    const id = button.primary ? 'ui.btnPrimary' : 'ui.btnGhost';
+    queueBox(id, button.x, button.y, button.w, button.h, {
+      alpha: button.disabled ? 0.45 : 1,
+      fallback: (buttonCtx) => {
+        drawButton(buttonCtx, button.x, button.y, button.w, button.h, button.label, button.primary, button.disabled, button.selected);
+      },
+    });
+  }
+}
+
+function paintButtonLabels(ctx: Ctx, vm: ViewModel): void {
+  for (let i = 0; i < vm.buttons.length; i += 1) {
+    const button = vm.buttons[i];
+    const id = button.primary ? 'ui.btnPrimary' : 'ui.btnGhost';
+    if (!spriteReady(id)) continue;
     ctx.save();
     ctx.globalAlpha = button.disabled ? 0.45 : 1;
     ctx.fillStyle = button.primary ? PALETTE.white : PALETTE.ink;
@@ -308,18 +370,35 @@ function paintButtons(ctx: Ctx, vm: ViewModel): void {
   }
 }
 
-function paintToasts(ctx: Ctx, vm: ViewModel): void {
+function queueToasts(vm: ViewModel): void {
+  for (let i = 0; i < vm.toasts.length; i += 1) {
+    const toast = vm.toasts[i];
+    const plate = toastImageFor(toast.text);
+    if (!plate) continue;
+    const w = Math.min(vm.width - 48, 240);
+    const x = (vm.width - w) / 2;
+    const y = vm.toastY - i * 42;
+    queueBox(plate.id, 0, 0, w, 34, {
+      tx: x,
+      ty: y,
+      rot: -0.03,
+      alpha: Math.max(0.2, toast.life),
+    });
+  }
+}
+
+function paintToastText(ctx: Ctx, vm: ViewModel): void {
   for (let i = 0; i < vm.toasts.length; i += 1) {
     const toast = vm.toasts[i];
     const w = Math.min(vm.width - 48, 240);
     const x = (vm.width - w) / 2;
     const y = vm.toastY - i * 42;
+    const plate = toastImageFor(toast.text);
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(-0.03);
     ctx.globalAlpha = Math.max(0.2, toast.life);
-    const plate = toastImageFor(toast.text);
-    if (!plate || !drawSprite(ctx, plate, 0, 0, w, 34)) fillTorn(ctx, w, 34, toast.seed || 3, '#fffaf1', 0.06);
+    if (!plate || !spriteReady(plate.id)) fillTorn(ctx, w, 34, toast.seed || 3, '#fffaf1', 0.06);
     ctx.fillStyle = PALETTE.ink;
     ctx.font = font(15, true);
     ctx.textAlign = 'center';
@@ -329,26 +408,14 @@ function paintToasts(ctx: Ctx, vm: ViewModel): void {
   }
 }
 
-function paintMeter(ctx: Ctx, x: number, y: number, w: number, h: number, ratio: number): boolean {
-  if (!drawSprite(ctx, UI.progressTrack, x, y, w, h)) return false;
-  const clamped = ratio < 0 ? 0 : ratio > 1 ? 1 : ratio;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, Math.max(0, w * clamped), h);
-  ctx.clip();
-  drawSprite(ctx, UI.progressFill, x, y, w, h);
-  ctx.restore();
-  return true;
-}
-
-function paintHearts(ctx: Ctx, right: number, y: number, charges: number, maxCharges: number): void {
+function queueHearts(right: number, y: number, charges: number, maxCharges: number): void {
   const size = 14;
   const gap = 2;
   const count = Math.max(0, Math.min(6, maxCharges));
   for (let i = 0; i < count; i += 1) {
-    const frame = i < charges ? UI.heart : UI.heartEmpty;
+    const id = i < charges ? 'ui.heart' : 'ui.heartEmpty';
     const x = right - (count - i) * (size + gap);
-    drawSprite(ctx, frame, x, y, size, size);
+    queueBox(id, x, y, size, size);
   }
 }
 

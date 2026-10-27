@@ -23,9 +23,9 @@ const { emptyAlbum, grantCard } = require('../dist/meta/cards');
 const { createReservedRewardedAd, REWARDED_AD_UNIT_ID } = require('../dist/meta/ads');
 const { getRegionalBoard } = require('../dist/meta/leaderboard');
 const { COPY } = require('../dist/content/copy');
-const { ALL_FRAMES } = require('../dist/content/collage');
+const { ASSETS, LAYERS, MANIFEST_VERSION, assetById, foodIdForLevel } = require('../dist/content/manifest');
 const { TOAST_LINES, toastImageFor } = require('../dist/content/toasts');
-const { loadCollage, resetCollageForTests, spriteReady } = require('../dist/ui/sprites');
+const { loadCollage, resetCollageForTests, spriteReady, spriteOrigin, beginSprites, queueBox, flushSprites } = require('../dist/ui/sprites');
 const { RECIPES, recipeForRun } = require('../dist/content/recipes');
 const {
   createTossDetector,
@@ -380,6 +380,10 @@ function pngInfo(buf) {
 }
 
 function testCollage() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '../assets/manifest.json'), 'utf8'));
+  assert.equal(manifest.version, 1);
+  assert.equal(MANIFEST_VERSION, 1);
+  assert.equal(ASSETS.length, manifest.items.length);
   const lines = [
     '火候？我跟火候不熟。',
     '颠勺不是甩锅，别误会。',
@@ -393,27 +397,46 @@ function testCollage() {
   assert.equal(TOAST_LINES.length, 8);
   for (let i = 0; i < lines.length; i += 1) {
     assert.equal(TOAST_LINES[i].text, lines[i]);
-    assert.equal(TOAST_LINES[i].image.path, `assets/type/type-toast-0${i + 1}.png`);
-    assert.ok(TOAST_LINES[i].image.pxW <= 280);
+    assert.equal(TOAST_LINES[i].image.id, `type.toast.${i + 1}`);
+    assert.equal(TOAST_LINES[i].image.path, `type/type-toast-0${i + 1}.png`);
+    assert.equal(TOAST_LINES[i].image.file, `assets/type/type-toast-0${i + 1}.png`);
+    assert.equal(TOAST_LINES[i].image.z, LAYERS.toast);
+    assert.deepEqual(TOAST_LINES[i].image.pivot, [0.5, 0.5]);
   }
-  assert.equal(toastImageFor(lines[6]).path, 'assets/type/type-toast-07.png');
+  assert.equal(toastImageFor(lines[6]).id, 'type.toast.7');
   assert.equal(toastImageFor('糊了'), null);
-  const perfect = ALL_FRAMES.find((frame) => frame.path.endsWith('type-perfect.png'));
-  const burnt = ALL_FRAMES.find((frame) => frame.path.endsWith('type-burnt.png'));
-  assert.ok(perfect.pxW <= 160 && burnt.pxW <= 160);
+  assert.equal(assetById('type.perfect').text, '颠漂亮了');
+  assert.equal(assetById('type.burnt').text, '糊了！');
+  assert.equal(assetById('type.perfect').w <= 160, true);
+  assert.equal(foodIdForLevel(4, 0), 'food.plateDone');
+  assert.ok(assetById('food.wokHandle').z <= LAYERS.wok);
+  assert.ok(assetById('fx.flameLick').z >= LAYERS.fxCook);
+  assert.ok(assetById('ui.heart').z >= LAYERS.ui);
+  assert.ok(assetById('fx.perfectBurst').z >= LAYERS.fxBurst);
+
+  const flame = spriteOrigin('fx.flameLick', 100, 200, 64, 96);
+  assert.equal(flame.x, 100 - 0.5 * 64);
+  assert.equal(flame.y, 200 - 1 * 96);
+  const track = spriteOrigin('ui.progressTrack', 16, 70, 200, 12);
+  assert.equal(track.x, 16);
+  assert.equal(track.y, 70 - 0.5 * 12);
 
   const seen = new Set();
-  for (const frame of ALL_FRAMES) {
-    assert.ok(!seen.has(frame.path), frame.path);
-    seen.add(frame.path);
-    assert.match(frame.path, /^assets\/(ui|food|fx|type)\/(ui|food|fx|type)-[a-z0-9-]+\.png$/);
-    const folder = frame.path.split('/')[1];
-    const prefix = path.basename(frame.path).split('-')[0];
-    assert.equal(prefix, folder, frame.path);
-    const info = pngInfo(fs.readFileSync(path.join(__dirname, '..', frame.path)));
-    assert.equal(info.w, frame.pxW, frame.path);
-    assert.equal(info.h, frame.pxH, frame.path);
-    assert.ok(frame.pxW <= 1024 && frame.pxH <= 1334, frame.path);
+  for (let i = 0; i < manifest.items.length; i += 1) {
+    const raw = manifest.items[i];
+    const item = ASSETS[i];
+    assert.equal(item.id, raw.id);
+    assert.equal(item.path, raw.path);
+    assert.equal(item.z, raw.z);
+    assert.deepEqual(item.pivot, raw.pivot);
+    assert.equal(item.file, `assets/${raw.path}`);
+    assert.ok(!seen.has(item.id), item.id);
+    seen.add(item.id);
+    assert.match(item.file, /^assets\/(ui|food|fx|type)\/(ui|food|fx|type)-[a-z0-9-]+\.png$/);
+    const folder = item.path.split('/')[0];
+    const prefix = path.basename(item.path).split('-')[0];
+    assert.equal(prefix, folder, item.path);
+    pngInfo(fs.readFileSync(path.join(__dirname, '..', item.file)));
   }
 
   resetCollageForTests();
@@ -435,11 +458,29 @@ function testCollage() {
       },
     };
   });
-  assert.equal(srcs.length, ALL_FRAMES.length);
-  for (let i = 0; i < ALL_FRAMES.length; i += 1) {
-    assert.equal(srcs[i], ALL_FRAMES[i].path);
-    assert.equal(spriteReady(ALL_FRAMES[i]), true);
+  assert.equal(srcs.length, ASSETS.length);
+  for (let i = 0; i < ASSETS.length; i += 1) {
+    assert.equal(srcs[i], ASSETS[i].file);
+    assert.equal(spriteReady(ASSETS[i].id), true);
   }
+
+  beginSprites();
+  queueBox('fx.perfectBurst', 0, 0, 32, 32);
+  queueBox('food.wokHandle', 0, 0, 20, 40);
+  queueBox('food.wokBase', 0, 0, 40, 20);
+  queueBox('ui.paperBg', 0, 0, 10, 10);
+  const order = flushSprites({
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    beginPath() {},
+    rect() {},
+    clip() {},
+    drawImage() {},
+    globalAlpha: 1,
+  });
+  assert.deepEqual(order, ['ui.paperBg', 'food.wokHandle', 'food.wokBase', 'fx.perfectBurst']);
   resetCollageForTests();
 }
 

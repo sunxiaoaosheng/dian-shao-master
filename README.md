@@ -15,7 +15,7 @@
 5. 模拟器可以直接玩。模拟器没有真陀螺仪，底部会出现 **手动颠勺**。
 6. 改了 `src/` 之后要重新编译（见下文）。仓库里已经提交了 `dist/`，导入后不必先装依赖就能预览。
 
-界面句子在 `src/content/copy.ts`。八句手写吐槽在 `src/content/toasts.ts`，对应 `assets/type/type-toast-01.png` 到 `08.png`。剪贴规格见 `docs/COLLAGE_ART_SPEC.md`。
+界面句子在 `src/content/copy.ts`。八句手写吐槽在 `src/content/toasts.ts`，和 `assets/manifest.json` 里的 `type.toast.*` 是同一句。剪贴规格见 `docs/COLLAGE_ART_SPEC.md`。
 
 ## 目录
 
@@ -31,8 +31,9 @@
 | `src/content/recipes.ts` | 菜谱树 |
 | `src/content/copy.ts` | 中文界面文案 |
 | `src/content/toasts.ts` | 八句手写吐槽 |
-| `src/content/collage.ts` | 剪贴路径和 @2x 尺寸 |
-| `src/ui/` | 剪贴风画布；图没加载完时退回矢量 |
+| `src/content/manifest.ts` | 读取 `assets/manifest.json` 的 id、路径、锚点、层级 |
+| `src/ui/` | 剪贴风画布；按清单 z 叠放，图没加载完时退回矢量 |
+| `assets/manifest.json` | 剪贴清单。占位图路径相对 `assets/` |
 | `assets/` | `ui` / `food` / `fx` / `type` 占位 PNG，正式图换文件不改名 |
 | `docs/COLLAGE_ART_SPEC.md` | 实拍剪贴规格 |
 | `src/meta/daily.ts` | 每天 3 锅，分享 / 广告加锅 |
@@ -126,6 +127,6 @@ npm install
 npm test
 ```
 
-`npm test` 会跑 `tsc`，再跑合并、糊锅、锅满、颠勺冷却、每日锅数、剪贴路径和画布冒烟。改完 `src/` 一定要再跑一次，开发者工具读的是 `dist/`。占位图用 `npm run assets` 按 `src/content/collage.ts` 重写。
+`npm test` 会跑 `tsc`，再跑合并、糊锅、锅满、颠勺冷却、每日锅数、剪贴清单和画布冒烟。改完 `src/` 一定要再跑一次，开发者工具读的是 `dist/`。占位图用 `npm run assets` 按 `assets/manifest.json` 重写。
 
 不要把 `dist/` 打成一个 `game.js`。模块边界要留着。

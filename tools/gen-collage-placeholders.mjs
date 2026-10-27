@@ -1,17 +1,58 @@
 /**
- * 按 src/content/collage.ts 的路径和 @2x 尺寸写 PNG-24 占位。
+ * 按 assets/manifest.json 的路径写 PNG-24 占位。像素是逻辑尺寸 × scaleDefault。
  * 直通 alpha，厨房配色，撕纸边 1–2px。没有职场图案，也没有汉字点阵。
  * 用法：npm run assets
  */
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
-import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 
-const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { ALL_FRAMES } = require(path.join(root, 'dist/content/collage.js'));
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets/manifest.json'), 'utf8'));
+const scale = manifest.scaleDefault || 2;
+
+const KIND = {
+  'ui.paperBg': 'paper',
+  'ui.panelTorn': 'panel',
+  'ui.tapeStrip': 'tape',
+  'ui.scoreChip': 'chip',
+  'ui.btnPrimary': 'btnPrimary',
+  'ui.btnGhost': 'btnGhost',
+  'ui.heart': 'heart',
+  'ui.heartEmpty': 'heartEmpty',
+  'ui.progressTrack': 'track',
+  'ui.progressFill': 'fill',
+  'food.wokBase': 'wok',
+  'food.oilSheen': 'oil',
+  'food.vegGreen': 'veg',
+  'food.meatSlice': 'meat',
+  'food.egg': 'egg',
+  'food.chili': 'chili',
+  'food.scallion': 'scallion',
+  'food.wokHandle': 'handle',
+  'food.plateDone': 'plate',
+  'fx.flameLick': 'flame',
+  'fx.smokePuff': 'smoke',
+  'fx.perfectBurst': 'burst',
+  'fx.missDrip': 'drip',
+  'type.perfect': 'perfect',
+  'type.burnt': 'burnt',
+};
+
+function kindFor(id) {
+  if (id.startsWith('fx.paperScrap')) return 'scrap';
+  if (id.startsWith('fx.oilStar')) return 'star';
+  if (id.startsWith('type.toast')) return 'toast';
+  return KIND[id] || 'paper';
+}
+
+const ALL_FRAMES = manifest.items.map((item) => ({
+  path: `assets/${item.path}`,
+  pxW: item.w * scale,
+  pxH: item.h * scale,
+  paint: kindFor(item.id),
+}));
 
 const KRAFT = [230, 211, 176, 255];
 const CREAM = [255, 250, 241, 255];
