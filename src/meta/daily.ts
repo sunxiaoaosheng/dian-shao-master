@@ -28,6 +28,11 @@ export function rollDaily(state: DailyState, today: string): DailyState {
   return state;
 }
 
+export function shareSlotsLeft(state: DailyState): number {
+  const left = MAX_SHARE_BONUS - state.shareBonus;
+  return left > 0 ? left : 0;
+}
+
 export function playsRemaining(state: DailyState): number {
   return FREE_PLAYS_PER_DAY + state.shareBonus + state.adBonus - state.playsUsed;
 }

@@ -1,5 +1,6 @@
-import type { SensitivityTier } from '../input/gyro';
+import { tossFeel, type SensitivityTier } from '../input/gyro';
 import { GRADUATION_MERGES, GRADUATION_MS, type HeatId } from '../meta/difficulty';
+import type { BurnWarnKind, GoalProgress } from '../meta/runGoal';
 
 /** 所有玩家能看见的句子都放这里，方便对着厨房口吻改，也方便测试挡住跑题的词。 */
 export const COPY = {
@@ -97,9 +98,43 @@ export function againLabel(graduated: boolean, heatName: string): string {
   return `再试这一火 · ${heatName}`;
 }
 
-export function restartLine(playsLeft: number, graduated: boolean, heatName: string): string {
-  if (playsLeft <= 0) return COPY.noPlays;
-  return nextPotLine(graduated, heatName);
+export function restartLine(playsLeft: number, graduated: boolean, heatName: string, shareLeft = 0): string {
+  if (playsLeft > 0) return nextPotLine(graduated, heatName);
+  if (shareLeft > 0) return '今天的免费锅用完了。自愿分享可以再领一锅，也可以明天再来。';
+  return '今天的锅和分享加锅都用完了。回灶台，明天再来。';
+}
+
+export function goalProgressLine(progress: GoalProgress): string {
+  const heatName = HEAT_NAME[progress.heatId];
+  const nextName = HEAT_NAME[progress.nextHeatId];
+  const aheadName = HEAT_NAME[progress.aheadHeatId];
+  const needSec = Math.round(progress.needMs / 1000);
+  const sec = Math.min(needSec, Math.floor(progress.elapsedMs / 1000));
+  if (progress.heatId === 'tutorial' && !progress.graduated) {
+    return `出师 ${progress.merges}/${progress.needMerges}·${sec}/${needSec}秒。下一火是${aheadName}，未出师仍是${nextName}。`;
+  }
+  if (progress.heatId === 'tutorial') {
+    return `出师了。收锅后下一火是${nextName}。`;
+  }
+  if (progress.graduated) {
+    return `${heatName}这口算过。收锅后下一火是${nextName}。`;
+  }
+  return `${heatName}未过。下一火才是${aheadName}，现在收锅仍是${heatName}。`;
+}
+
+export function burnWarnLine(kind: BurnWarnKind): string {
+  if (kind === 'pot') return '火候要满了，颠一下';
+  if (kind === 'piece') return '有一块快糊边';
+  return '';
+}
+
+export function tossFeelLine(tier: SensitivityTier): string {
+  const sec = (tossFeel(tier).cooldownMs / 1000).toFixed(1);
+  return `${TIER_NAME[tier]}：冷却 ${sec} 秒`;
+}
+
+export function tossAck(tier: SensitivityTier): string {
+  return `${TIER_NAME[tier]}认下了`;
 }
 
 export function cardBody(name: string): string {

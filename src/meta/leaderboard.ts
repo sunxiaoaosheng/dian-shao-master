@@ -38,8 +38,13 @@ export function readBoard(result: unknown): BoardEntry[] {
   return out;
 }
 
+/** 关掉时不要请求。 */
+export function boardSwitchOpen(enabled: boolean): boolean {
+  return enabled;
+}
+
 /** 开关关掉或没有云函数时直接空列表，不会去调用 call。 */
 export function fetchRegionalBoard(call: CloudCall | null): Promise<BoardEntry[]> {
-  if (!BOARD_ENABLED || !call) return Promise.resolve([]);
+  if (!boardSwitchOpen(BOARD_ENABLED) || !call) return Promise.resolve([]);
   return call(BOARD_FUNCTION_NAME, {}).then((result) => readBoard(result)).catch(() => []);
 }

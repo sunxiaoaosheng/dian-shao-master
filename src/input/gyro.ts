@@ -66,6 +66,13 @@ export interface GyroPeek {
   armed: boolean;
 }
 
+/** 三档手感的可见反馈。冷却和阈值都从 TIERS 来，晃动幅度只影响画面。 */
+export function tossFeel(tier: SensitivityTier): { cooldownMs: number; shake: number; accelG: number; angleDeg: number } {
+  const cfg = TIERS[tier];
+  const shake = tier === 'gentle' ? 0.72 : tier === 'fierce' ? 1.2 : 1;
+  return { cooldownMs: cfg.cooldownMs, shake, accelG: cfg.accelG, angleDeg: cfg.angleDeg };
+}
+
 export function cooldownMsFor(tier: SensitivityTier): number {
   const ms = TIERS[tier].cooldownMs;
   if (ms < COOLDOWN_MIN_MS) return COOLDOWN_MIN_MS;

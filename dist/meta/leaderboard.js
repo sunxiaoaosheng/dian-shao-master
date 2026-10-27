@@ -7,6 +7,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BOARD_FUNCTION_NAME = exports.BOARD_ENABLED = void 0;
 exports.readBoard = readBoard;
+exports.boardSwitchOpen = boardSwitchOpen;
 exports.fetchRegionalBoard = fetchRegionalBoard;
 exports.BOARD_ENABLED = false;
 exports.BOARD_FUNCTION_NAME = 'regionalBoard';
@@ -34,9 +35,13 @@ function readBoard(result) {
     }
     return out;
 }
+/** 关掉时不要请求。 */
+function boardSwitchOpen(enabled) {
+    return enabled;
+}
 /** 开关关掉或没有云函数时直接空列表，不会去调用 call。 */
 function fetchRegionalBoard(call) {
-    if (!exports.BOARD_ENABLED || !call)
+    if (!boardSwitchOpen(exports.BOARD_ENABLED) || !call)
         return Promise.resolve([]);
     return call(exports.BOARD_FUNCTION_NAME, {}).then((result) => readBoard(result)).catch(() => []);
 }

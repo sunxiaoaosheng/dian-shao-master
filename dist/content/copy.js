@@ -7,6 +7,10 @@ exports.heatGoal = heatGoal;
 exports.nextPotLine = nextPotLine;
 exports.againLabel = againLabel;
 exports.restartLine = restartLine;
+exports.goalProgressLine = goalProgressLine;
+exports.burnWarnLine = burnWarnLine;
+exports.tossFeelLine = tossFeelLine;
+exports.tossAck = tossAck;
 exports.cardBody = cardBody;
 exports.cardToast = cardToast;
 exports.scoreLabel = scoreLabel;
@@ -15,6 +19,7 @@ exports.tossedLabel = tossedLabel;
 exports.roundRecap = roundRecap;
 exports.cooldownLabel = cooldownLabel;
 exports.pickLine = pickLine;
+const gyro_1 = require("../input/gyro");
 const difficulty_1 = require("../meta/difficulty");
 /** 所有玩家能看见的句子都放这里，方便对着厨房口吻改，也方便测试挡住跑题的词。 */
 exports.COPY = {
@@ -106,10 +111,43 @@ function againLabel(graduated, heatName) {
         return `炒下一火 · ${heatName}`;
     return `再试这一火 · ${heatName}`;
 }
-function restartLine(playsLeft, graduated, heatName) {
-    if (playsLeft <= 0)
-        return exports.COPY.noPlays;
-    return nextPotLine(graduated, heatName);
+function restartLine(playsLeft, graduated, heatName, shareLeft = 0) {
+    if (playsLeft > 0)
+        return nextPotLine(graduated, heatName);
+    if (shareLeft > 0)
+        return '今天的免费锅用完了。自愿分享可以再领一锅，也可以明天再来。';
+    return '今天的锅和分享加锅都用完了。回灶台，明天再来。';
+}
+function goalProgressLine(progress) {
+    const heatName = exports.HEAT_NAME[progress.heatId];
+    const nextName = exports.HEAT_NAME[progress.nextHeatId];
+    const aheadName = exports.HEAT_NAME[progress.aheadHeatId];
+    const needSec = Math.round(progress.needMs / 1000);
+    const sec = Math.min(needSec, Math.floor(progress.elapsedMs / 1000));
+    if (progress.heatId === 'tutorial' && !progress.graduated) {
+        return `出师 ${progress.merges}/${progress.needMerges}·${sec}/${needSec}秒。下一火是${aheadName}，未出师仍是${nextName}。`;
+    }
+    if (progress.heatId === 'tutorial') {
+        return `出师了。收锅后下一火是${nextName}。`;
+    }
+    if (progress.graduated) {
+        return `${heatName}这口算过。收锅后下一火是${nextName}。`;
+    }
+    return `${heatName}未过。下一火才是${aheadName}，现在收锅仍是${heatName}。`;
+}
+function burnWarnLine(kind) {
+    if (kind === 'pot')
+        return '火候要满了，颠一下';
+    if (kind === 'piece')
+        return '有一块快糊边';
+    return '';
+}
+function tossFeelLine(tier) {
+    const sec = ((0, gyro_1.tossFeel)(tier).cooldownMs / 1000).toFixed(1);
+    return `${exports.TIER_NAME[tier]}：冷却 ${sec} 秒`;
+}
+function tossAck(tier) {
+    return `${exports.TIER_NAME[tier]}认下了`;
 }
 function cardBody(name) {
     return `招牌「${name}」夹进手账了。`;

@@ -4,15 +4,17 @@ import {
   HEAT_NAME,
   TIER_NAME,
   againLabel,
+  burnWarnLine,
   cardBody,
   chargesLabel,
   cooldownLabel,
-  heatGoal,
+  goalProgressLine,
   playsLeftLabel,
   restartLine,
   roundRecap,
   scoreLabel,
   tossedLabel,
+  tossFeelLine,
 } from '../content/copy';
 import { cookRatio } from '../core/burn';
 import type { Session } from '../core/session';
@@ -24,6 +26,7 @@ import type { AlbumState } from '../meta/cards';
 import type { FailReason } from '../core/types';
 import type { HeatId } from '../meta/difficulty';
 import type { BoardEntry } from '../meta/leaderboard';
+import { burnWarnKind, goalProgress } from '../meta/runGoal';
 import type { AlbumCardVM, ButtonVM, ScreenId, ViewModel } from './types';
 
 export interface ToastState {
@@ -41,6 +44,10 @@ export interface ComposeInput {
   safeBottom: number;
   now: number;
   playsLeft: number;
+  /** 今天还能靠自愿分享加的锅。用完且免费锅也没了，结算就指回灶台。 */
+  shareLeft: number;
+  /** 这一口还没写进出师次数。出师与否看本局合成、时间和招牌。 */
+  runsCompleted: number;
   tier: SensitivityTier;
   heatId: HeatId;
   recipe: Recipe | null;
@@ -85,6 +92,7 @@ export function composeView(input: ComposeInput): ViewModel {
     playsHint: COPY.playsHint,
     heatLabel: HEAT_NAME[input.heatId],
     goalText: input.goalText,
+    feelText: tossFeelLine(input.tier),
     sensorLabel: input.sensorLabel,
     buttons: [],
     hits: [],
@@ -159,7 +167,7 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
   const recipe = input.recipe;
   if (!session || !recipe) return;
   const top = input.safeTop + 8;
-  const bottom = 112 + input.safeBottom;
+  const bottom = 156 + input.safeBottom;
   const gap = 6;
   const availW = input.width - 28;
   const availH = input.height - bottom - (top + 86);
@@ -216,7 +224,16 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
     showTossButton: input.showTossButton,
     overflowText: overflow === null ? '' : COPY.overflow,
     hint: session.hint && session.merges === 0 ? COPY.hint : '',
-    goalText: heatGoal(session.heatId, session.cols, session.rows, session.maxCharges),
+    mergeRule: COPY.hint,
+    goalText: goalProgressLine(goalProgress({
+      runsCompleted: input.runsCompleted,
+      heatId: session.heatId,
+      merges: session.merges,
+      elapsedMs: session.elapsedMs,
+      cards: session.cardsThisRun,
+    })),
+    warnText: burnWarnLine(burnWarnKind(session.meter, hottestCook(session))),
+    feelText: tossFeelLine(input.tier),
     wok: { x: gx - 18, y: gy - 8, w: gridW + 36, h: gridH + 22 },
     nextBox: { x: 16, y: input.height - input.safeBottom - 92, w: 68, h: 76 },
   };
@@ -247,7 +264,9 @@ function layoutResult(input: ComposeInput, vm: ViewModel): void {
     body: `${detail}${quip}${card}`,
     scoreText: scoreLabel(result ? result.score : 0),
     recap: result ? roundRecap(result.seconds, result.merges, result.tosses) : '',
-    nextLine: result ? restartLine(input.playsLeft, result.graduated, HEAT_NAME[result.nextHeatId]) : '',
+    nextLine: result
+      ? restartLine(input.playsLeft, result.graduated, HEAT_NAME[result.nextHeatId], input.shareLeft)
+      : '',
   };
   const pad = 18;
   const bw = input.width - pad * 2;
@@ -309,6 +328,15 @@ function layoutAlbum(input: ComposeInput, vm: ViewModel): void {
     false,
     false,
   ));
+}
+
+function hottestCook(session: Session): number {
+  let hottest = 0;
+  for (let i = 0; i < session.cells.length; i += 1) {
+    const ratio = cookRatio(session.cells[i], session.baseBurnMs, session.burnPerLevelMs);
+    if (ratio > hottest) hottest = ratio;
+  }
+  return hottest;
 }
 
 function button(

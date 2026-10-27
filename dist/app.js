@@ -119,6 +119,8 @@ class GameApp {
             safeBottom: this.platform.safeBottom,
             now: this.platform.now(),
             playsLeft: (0, daily_1.playsRemaining)(this.daily),
+            shareLeft: (0, daily_1.shareSlotsLeft)(this.daily),
+            runsCompleted: this.meta.runsCompleted,
             tier: this.meta.tier,
             heatId: this.session && this.screen !== 'home' ? this.session.heatId : upcoming.id,
             goalText: (0, copy_1.heatGoal)(upcoming.id, upcoming.cols, upcoming.rows, upcoming.tossCharges),
@@ -236,8 +238,9 @@ class GameApp {
             return;
         }
         this.tossReadyAt = (0, gyro_1.nextReadyAt)(now, this.meta.tier);
-        this.shake = 1;
+        this.shake = (0, gyro_1.tossFeel)(this.meta.tier).shake;
         this.platform.vibrate();
+        this.toast((0, copy_1.tossAck)(this.meta.tier));
         this.toast((0, toasts_1.pickToast)(now).text);
         this.captureMoment(source === 'gyro' ? 1 : 0.65);
         this.consumeEvents(result.events);

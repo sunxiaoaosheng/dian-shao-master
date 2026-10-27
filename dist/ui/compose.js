@@ -5,6 +5,7 @@ const recipes_1 = require("../content/recipes");
 const copy_1 = require("../content/copy");
 const burn_1 = require("../core/burn");
 const session_1 = require("../core/session");
+const runGoal_1 = require("../meta/runGoal");
 const TIERS = ['gentle', 'standard', 'fierce'];
 function composeView(input) {
     const vm = {
@@ -19,6 +20,7 @@ function composeView(input) {
         playsHint: copy_1.COPY.playsHint,
         heatLabel: copy_1.HEAT_NAME[input.heatId],
         goalText: input.goalText,
+        feelText: (0, copy_1.tossFeelLine)(input.tier),
         sensorLabel: input.sensorLabel,
         buttons: [],
         hits: [],
@@ -96,7 +98,7 @@ function layoutPlay(input, vm) {
     if (!session || !recipe)
         return;
     const top = input.safeTop + 8;
-    const bottom = 112 + input.safeBottom;
+    const bottom = 156 + input.safeBottom;
     const gap = 6;
     const availW = input.width - 28;
     const availH = input.height - bottom - (top + 86);
@@ -152,7 +154,16 @@ function layoutPlay(input, vm) {
         showTossButton: input.showTossButton,
         overflowText: overflow === null ? '' : copy_1.COPY.overflow,
         hint: session.hint && session.merges === 0 ? copy_1.COPY.hint : '',
-        goalText: (0, copy_1.heatGoal)(session.heatId, session.cols, session.rows, session.maxCharges),
+        mergeRule: copy_1.COPY.hint,
+        goalText: (0, copy_1.goalProgressLine)((0, runGoal_1.goalProgress)({
+            runsCompleted: input.runsCompleted,
+            heatId: session.heatId,
+            merges: session.merges,
+            elapsedMs: session.elapsedMs,
+            cards: session.cardsThisRun,
+        })),
+        warnText: (0, copy_1.burnWarnLine)((0, runGoal_1.burnWarnKind)(session.meter, hottestCook(session))),
+        feelText: (0, copy_1.tossFeelLine)(input.tier),
         wok: { x: gx - 18, y: gy - 8, w: gridW + 36, h: gridH + 22 },
         nextBox: { x: 16, y: input.height - input.safeBottom - 92, w: 68, h: 76 },
     };
@@ -172,7 +183,9 @@ function layoutResult(input, vm) {
         body: `${detail}${quip}${card}`,
         scoreText: (0, copy_1.scoreLabel)(result ? result.score : 0),
         recap: result ? (0, copy_1.roundRecap)(result.seconds, result.merges, result.tosses) : '',
-        nextLine: result ? (0, copy_1.restartLine)(input.playsLeft, result.graduated, copy_1.HEAT_NAME[result.nextHeatId]) : '',
+        nextLine: result
+            ? (0, copy_1.restartLine)(input.playsLeft, result.graduated, copy_1.HEAT_NAME[result.nextHeatId], input.shareLeft)
+            : '',
     };
     const pad = 18;
     const bw = input.width - pad * 2;
@@ -226,6 +239,15 @@ function layoutAlbum(input, vm) {
     }
     vm.album = cards;
     vm.buttons.push(button('home', copy_1.COPY.back, 18, input.height - input.safeBottom - 62, input.width - 36, 46, true, false, false));
+}
+function hottestCook(session) {
+    let hottest = 0;
+    for (let i = 0; i < session.cells.length; i += 1) {
+        const ratio = (0, burn_1.cookRatio)(session.cells[i], session.baseBurnMs, session.burnPerLevelMs);
+        if (ratio > hottest)
+            hottest = ratio;
+    }
+    return hottest;
 }
 function button(id, label, x, y, w, h, primary, disabled, selected) {
     return { id, label, x, y, w, h, primary, disabled, selected };

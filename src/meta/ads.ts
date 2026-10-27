@@ -24,6 +24,11 @@ export interface RewardedAdHook {
   show(): Promise<AdResult>;
 }
 
+/** 开关关掉或广告位是空的，都不算接上。 */
+export function adSwitchOpen(enabled: boolean, adUnitId: string): boolean {
+  return enabled && adUnitId.length > 0;
+}
+
 export function createRewardedAd(opts: {
   enabled: boolean;
   adUnitId: string;
@@ -32,7 +37,7 @@ export function createRewardedAd(opts: {
   let ad: WxRewardedVideoAd | null = null;
   let finish: ((result: AdResult) => void) | null = null;
 
-  const configured = () => opts.enabled && opts.adUnitId.length > 0;
+  const configured = () => adSwitchOpen(opts.enabled, opts.adUnitId);
 
   return {
     isConfigured: configured,

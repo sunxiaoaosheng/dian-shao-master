@@ -89,7 +89,16 @@ function paintHomeText(ctx: Ctx, vm: ViewModel): void {
   ctx.font = font(12, false);
   ctx.textAlign = 'left';
   const hintY = tierButton ? tierButton.y + 42 : cardY + 118 + 8;
-  drawWrapped(ctx, vm.playsHint, 20, hintY, vm.width - 40, 16);
+  let playsY = hintY;
+  if (vm.feelText) {
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = font(12, true);
+    drawWrapped(ctx, vm.feelText, 20, hintY, vm.width - 40, 14);
+    playsY = hintY + 16;
+  }
+  ctx.fillStyle = PALETTE.inkSoft;
+  ctx.font = font(12, false);
+  drawWrapped(ctx, vm.playsHint, 20, playsY, vm.width - 40, 16);
 
   if (vm.showBoard) {
     ctx.fillStyle = PALETTE.ink;
@@ -195,14 +204,25 @@ function paintPlayText(ctx: Ctx, vm: ViewModel): void {
   ctx.font = font(12, false);
   ctx.fillStyle = PALETTE.inkSoft;
   ctx.fillText(play.chargesText, vm.width - 16, 40);
+  const feelLine = play.cooldownText || play.feelText;
+  if (feelLine) {
+    ctx.font = font(11, false);
+    ctx.fillStyle = play.cooldownText ? PALETTE.chiliDeep : PALETTE.inkSoft;
+    ctx.fillText(feelLine, vm.width - 16, 54);
+  }
 
   if (!spriteReady('ui.progressTrack') || !spriteReady('ui.progressFill')) {
     drawMeter(ctx, 16, 64, vm.width - 32, 12, play.meter);
   }
-  ctx.fillStyle = PALETTE.inkSoft;
+  ctx.fillStyle = play.warnText ? PALETTE.chiliDeep : PALETTE.inkSoft;
   ctx.textAlign = 'left';
   ctx.font = font(11, true);
-  ctx.fillText(COPY.meter, 16, 50);
+  ctx.fillText(play.warnText || COPY.meter, 16, 50);
+  if (play.mergeRule) {
+    ctx.fillStyle = PALETTE.inkSoft;
+    ctx.font = font(11, false);
+    drawWrapped(ctx, play.mergeRule, 16, 78, vm.width - 32, 14);
+  }
   drawSteam(ctx, play.wok.x + play.wok.w / 2, play.wok.y + 6, vm.now);
 
   for (let i = 0; i < play.cells.length; i += 1) {
@@ -256,11 +276,7 @@ function paintPlayText(ctx: Ctx, vm: ViewModel): void {
   if (play.goalText) {
     ctx.fillStyle = PALETTE.ink;
     ctx.font = font(12, true);
-    drawWrapped(ctx, play.goalText, noteX, play.nextBox.y - 34, Math.max(80, noteW), 16);
-  }
-  if (play.cooldownText) {
-    ctx.fillStyle = PALETTE.chiliDeep;
-    ctx.fillText(play.cooldownText, noteX, play.nextBox.y + 52);
+    drawWrapped(ctx, play.goalText, 16, play.nextBox.y - 52, vm.width - 32, 15);
   }
 
   if (vm.shake > 0.2) {

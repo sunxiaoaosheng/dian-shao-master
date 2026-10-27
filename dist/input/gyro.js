@@ -11,6 +11,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TossDetector = exports.TIERS = exports.COOLDOWN_MAX_MS = exports.COOLDOWN_MIN_MS = exports.CALIBRATION_MS = exports.WINDOW_MS = void 0;
+exports.tossFeel = tossFeel;
 exports.cooldownMsFor = cooldownMsFor;
 exports.canAcceptToss = canAcceptToss;
 exports.nextReadyAt = nextReadyAt;
@@ -30,6 +31,12 @@ const RELAX_ACCEL_G = 0.45;
 const RELAX_ANGLE = 8;
 const MPS2_MEDIAN = 4;
 const GRAVITY_G = 9.80665;
+/** 三档手感的可见反馈。冷却和阈值都从 TIERS 来，晃动幅度只影响画面。 */
+function tossFeel(tier) {
+    const cfg = exports.TIERS[tier];
+    const shake = tier === 'gentle' ? 0.72 : tier === 'fierce' ? 1.2 : 1;
+    return { cooldownMs: cfg.cooldownMs, shake, accelG: cfg.accelG, angleDeg: cfg.angleDeg };
+}
 function cooldownMsFor(tier) {
     const ms = exports.TIERS[tier].cooldownMs;
     if (ms < exports.COOLDOWN_MIN_MS)

@@ -84,7 +84,16 @@ function paintHomeText(ctx, vm) {
     ctx.font = (0, theme_1.font)(12, false);
     ctx.textAlign = 'left';
     const hintY = tierButton ? tierButton.y + 42 : cardY + 118 + 8;
-    (0, draw_1.drawWrapped)(ctx, vm.playsHint, 20, hintY, vm.width - 40, 16);
+    let playsY = hintY;
+    if (vm.feelText) {
+        ctx.fillStyle = theme_1.PALETTE.ink;
+        ctx.font = (0, theme_1.font)(12, true);
+        (0, draw_1.drawWrapped)(ctx, vm.feelText, 20, hintY, vm.width - 40, 14);
+        playsY = hintY + 16;
+    }
+    ctx.fillStyle = theme_1.PALETTE.inkSoft;
+    ctx.font = (0, theme_1.font)(12, false);
+    (0, draw_1.drawWrapped)(ctx, vm.playsHint, 20, playsY, vm.width - 40, 16);
     if (vm.showBoard) {
         ctx.fillStyle = theme_1.PALETTE.ink;
         ctx.font = (0, theme_1.font)(14, true);
@@ -193,13 +202,24 @@ function paintPlayText(ctx, vm) {
     ctx.font = (0, theme_1.font)(12, false);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
     ctx.fillText(play.chargesText, vm.width - 16, 40);
+    const feelLine = play.cooldownText || play.feelText;
+    if (feelLine) {
+        ctx.font = (0, theme_1.font)(11, false);
+        ctx.fillStyle = play.cooldownText ? theme_1.PALETTE.chiliDeep : theme_1.PALETTE.inkSoft;
+        ctx.fillText(feelLine, vm.width - 16, 54);
+    }
     if (!(0, sprites_1.spriteReady)('ui.progressTrack') || !(0, sprites_1.spriteReady)('ui.progressFill')) {
         (0, draw_1.drawMeter)(ctx, 16, 64, vm.width - 32, 12, play.meter);
     }
-    ctx.fillStyle = theme_1.PALETTE.inkSoft;
+    ctx.fillStyle = play.warnText ? theme_1.PALETTE.chiliDeep : theme_1.PALETTE.inkSoft;
     ctx.textAlign = 'left';
     ctx.font = (0, theme_1.font)(11, true);
-    ctx.fillText(copy_1.COPY.meter, 16, 50);
+    ctx.fillText(play.warnText || copy_1.COPY.meter, 16, 50);
+    if (play.mergeRule) {
+        ctx.fillStyle = theme_1.PALETTE.inkSoft;
+        ctx.font = (0, theme_1.font)(11, false);
+        (0, draw_1.drawWrapped)(ctx, play.mergeRule, 16, 78, vm.width - 32, 14);
+    }
     (0, draw_1.drawSteam)(ctx, play.wok.x + play.wok.w / 2, play.wok.y + 6, vm.now);
     for (let i = 0; i < play.cells.length; i += 1) {
         const cell = play.cells[i];
@@ -239,11 +259,7 @@ function paintPlayText(ctx, vm) {
     if (play.goalText) {
         ctx.fillStyle = theme_1.PALETTE.ink;
         ctx.font = (0, theme_1.font)(12, true);
-        (0, draw_1.drawWrapped)(ctx, play.goalText, noteX, play.nextBox.y - 34, Math.max(80, noteW), 16);
-    }
-    if (play.cooldownText) {
-        ctx.fillStyle = theme_1.PALETTE.chiliDeep;
-        ctx.fillText(play.cooldownText, noteX, play.nextBox.y + 52);
+        (0, draw_1.drawWrapped)(ctx, play.goalText, 16, play.nextBox.y - 52, vm.width - 32, 15);
     }
     if (vm.shake > 0.2) {
         const cx = play.wok.x + play.wok.w / 2;

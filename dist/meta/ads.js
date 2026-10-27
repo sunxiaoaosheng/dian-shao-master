@@ -6,13 +6,18 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.REWARDED_AD_UNIT_ID = exports.ADS_ENABLED = void 0;
+exports.adSwitchOpen = adSwitchOpen;
 exports.createRewardedAd = createRewardedAd;
 exports.ADS_ENABLED = false;
 exports.REWARDED_AD_UNIT_ID = '';
+/** 开关关掉或广告位是空的，都不算接上。 */
+function adSwitchOpen(enabled, adUnitId) {
+    return enabled && adUnitId.length > 0;
+}
 function createRewardedAd(opts) {
     let ad = null;
     let finish = null;
-    const configured = () => opts.enabled && opts.adUnitId.length > 0;
+    const configured = () => adSwitchOpen(opts.enabled, opts.adUnitId);
     return {
         isConfigured: configured,
         show() {

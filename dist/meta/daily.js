@@ -4,6 +4,7 @@ exports.MAX_AD_BONUS = exports.MAX_SHARE_BONUS = exports.FREE_PLAYS_PER_DAY = vo
 exports.emptyDaily = emptyDaily;
 exports.formatDay = formatDay;
 exports.rollDaily = rollDaily;
+exports.shareSlotsLeft = shareSlotsLeft;
 exports.playsRemaining = playsRemaining;
 exports.canStart = canStart;
 exports.consumePlay = consumePlay;
@@ -30,6 +31,10 @@ function rollDaily(state, today) {
     if (state.date !== today)
         return emptyDaily(today);
     return state;
+}
+function shareSlotsLeft(state) {
+    const left = exports.MAX_SHARE_BONUS - state.shareBonus;
+    return left > 0 ? left : 0;
 }
 function playsRemaining(state) {
     return exports.FREE_PLAYS_PER_DAY + state.shareBonus + state.adBonus - state.playsUsed;

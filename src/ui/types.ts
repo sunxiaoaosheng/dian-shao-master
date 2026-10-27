@@ -46,7 +46,12 @@ export interface PlayVM {
   showTossButton: boolean;
   overflowText: string;
   hint: string;
+  /** 整局都在，提醒上下左右同级才合成。 */
+  mergeRule: string;
   goalText: string;
+  /** 火候条或单块快糊时留在画面上，不跟着短句一起消失。 */
+  warnText: string;
+  feelText: string;
   wok: { x: number; y: number; w: number; h: number };
   nextBox: { x: number; y: number; w: number; h: number };
   cooldownText: string;
@@ -85,6 +90,7 @@ export interface ViewModel {
   playsHint: string;
   heatLabel: string;
   goalText: string;
+  feelText: string;
   sensorLabel: string;
   boardNote: string;
   buttons: ButtonVM[];

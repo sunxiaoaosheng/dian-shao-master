@@ -16,14 +16,27 @@ const {
   grantAdBonus,
   rollDaily,
   parseDaily,
+  shareSlotsLeft,
   FREE_PLAYS_PER_DAY,
   MAX_SHARE_BONUS,
 } = require('../dist/meta/daily');
 const { emptyAlbum, grantCard } = require('../dist/meta/cards');
-const { createRewardedAd, ADS_ENABLED, REWARDED_AD_UNIT_ID } = require('../dist/meta/ads');
-const { fetchRegionalBoard, readBoard, BOARD_ENABLED, BOARD_FUNCTION_NAME } = require('../dist/meta/leaderboard');
+const { createRewardedAd, adSwitchOpen, ADS_ENABLED, REWARDED_AD_UNIT_ID } = require('../dist/meta/ads');
+const { fetchRegionalBoard, readBoard, boardSwitchOpen, BOARD_ENABLED, BOARD_FUNCTION_NAME } = require('../dist/meta/leaderboard');
 const { didGraduate, GRADUATION_MS, GRADUATION_MERGES } = require('../dist/meta/difficulty');
-const { COPY, roundRecap, cooldownLabel, againLabel, heatGoal } = require('../dist/content/copy');
+const { goalProgress, burnWarnKind } = require('../dist/meta/runGoal');
+const {
+  COPY,
+  roundRecap,
+  cooldownLabel,
+  againLabel,
+  heatGoal,
+  restartLine,
+  goalProgressLine,
+  burnWarnLine,
+  tossFeelLine,
+  tossAck,
+} = require('../dist/content/copy');
 const { SHARE_STICKER_ID } = require('../dist/viral/shareCard');
 const { ASSETS, LAYERS, MANIFEST_VERSION, assetById, foodIdForLevel } = require('../dist/content/manifest');
 const { TOAST_LINES, toastImageFor } = require('../dist/content/toasts');
@@ -32,6 +45,7 @@ const { RECIPES, recipeForRun } = require('../dist/content/recipes');
 const {
   createTossDetector,
   cooldownMsFor,
+  tossFeel,
   TIERS,
   COOLDOWN_MIN_MS,
   COOLDOWN_MAX_MS,
@@ -606,6 +620,8 @@ function testPaint() {
     safeBottom: 12,
     now: 5000,
     playsLeft: 2,
+    shareLeft: 2,
+    runsCompleted: 0,
     tier: 'standard',
     heatId: 'tutorial',
     recipe,
@@ -666,6 +682,102 @@ function testPaint() {
   const cooling = composeView(Object.assign({}, base, { screen: 'play', tossWaitMs: 600 }));
   assert.ok(cooling.play.cooldownText.includes('0.6'));
   assert.equal(cooldownLabel('家常', 600), cooling.play.cooldownText);
+
+  const playing = composeView(Object.assign({}, base, { screen: 'play' }));
+  assert.equal(playing.play.mergeRule, COPY.hint);
+  assert.ok(playing.play.goalText.includes('出师'));
+  assert.ok(playing.play.goalText.includes('下一火'));
+  assert.ok(playing.play.goalText.includes('小火'));
+  assert.ok(playing.play.feelText.includes('0.6'));
+  const hot = createSession({
+    recipeId: recipe.id,
+    maxLevel: recipe.levels.length,
+    profile: HEAT[0],
+    seed: 2,
+  });
+  hot.meter = 75;
+  const warned = composeView(Object.assign({}, base, { screen: 'play', session: hot }));
+  assert.equal(warned.play.warnText, burnWarnLine('pot'));
+  assert.ok(warned.play.warnText.includes('颠'));
+  const piece = createSession({
+    recipeId: recipe.id,
+    maxLevel: recipe.levels.length,
+    profile: HEAT[0],
+    seed: 3,
+  });
+  const occupied = piece.cells.find((cell) => cell.level > 0);
+  occupied.cookMs = piece.baseBurnMs;
+  piece.meter = 10;
+  const edge = composeView(Object.assign({}, base, { screen: 'play', session: piece }));
+  assert.equal(edge.play.warnText, burnWarnLine('piece'));
+
+  const home = composeView(Object.assign({}, base, { screen: 'home' }));
+  assert.ok(home.feelText.includes('家常'));
+  assert.ok(home.buttons.some((button) => button.id === 'start'));
+
+  const shareOnly = composeView(Object.assign({}, base, { screen: 'result', playsLeft: 0, shareLeft: 1 }));
+  assert.equal(shareOnly.result.nextLine, restartLine(0, true, '小火', 1));
+  assert.ok(shareOnly.result.nextLine.includes('分享'));
+  assert.ok(!shareOnly.buttons.some((button) => button.id === 'again'));
+  assert.ok(shareOnly.buttons.some((button) => button.id === 'home'));
+  const tomorrow = composeView(Object.assign({}, base, { screen: 'result', playsLeft: 0, shareLeft: 0 }));
+  assert.ok(tomorrow.result.nextLine.includes('明天'));
+  assert.ok(tomorrow.buttons.some((button) => button.id === 'home'));
+  assert.ok(!tomorrow.buttons.some((button) => button.id === 'again'));
+}
+
+function testFeel() {
+  const gentle = tossFeel('gentle');
+  const standard = tossFeel('standard');
+  const fierce = tossFeel('fierce');
+  assert.equal(gentle.cooldownMs, 800);
+  assert.equal(standard.cooldownMs, 600);
+  assert.equal(fierce.cooldownMs, 400);
+  assert.ok(gentle.shake < standard.shake && standard.shake < fierce.shake);
+  const lines = [tossFeelLine('gentle'), tossFeelLine('standard'), tossFeelLine('fierce')];
+  assert.equal(new Set(lines).size, 3);
+  assert.ok(tossAck('fierce').includes('猛火'));
+
+  assert.equal(burnWarnKind(74, 0.79), 'none');
+  assert.equal(burnWarnKind(75, 0), 'pot');
+  assert.equal(burnWarnKind(10, 0.8), 'piece');
+  assert.equal(burnWarnKind(80, 0.95), 'pot');
+  assert.equal(burnWarnLine('none'), '');
+
+  const fresh = goalProgress({ runsCompleted: 0, heatId: 'tutorial', merges: 0, elapsedMs: 0, cards: 0 });
+  assert.equal(fresh.graduated, false);
+  assert.equal(fresh.nextHeatId, 'tutorial');
+  assert.equal(fresh.aheadHeatId, 'simmer');
+  const merged = goalProgress({ runsCompleted: 0, heatId: 'tutorial', merges: 1, elapsedMs: 0, cards: 0 });
+  assert.equal(merged.graduated, true);
+  assert.equal(merged.nextHeatId, 'simmer');
+  const waited = goalProgress({ runsCompleted: 0, heatId: 'tutorial', merges: 0, elapsedMs: 20000, cards: 0 });
+  assert.equal(waited.graduated, true);
+  assert.equal(waited.nextHeatId, 'simmer');
+  const line = goalProgressLine(fresh);
+  assert.ok(line.includes('出师'));
+  assert.ok(line.includes('下一火'));
+  assert.ok(line.includes('小火'));
+  assert.ok(goalProgressLine(merged).includes('小火'));
+  const simmer = goalProgress({ runsCompleted: 1, heatId: 'simmer', merges: 0, elapsedMs: 0, cards: 0 });
+  assert.equal(simmer.graduated, false);
+  assert.equal(simmer.nextHeatId, 'simmer');
+  assert.equal(simmer.aheadHeatId, 'stir');
+  assert.ok(goalProgressLine(simmer).includes('中火'));
+  assert.ok(goalProgressLine(simmer).includes('仍是小火'));
+
+  assert.equal(adSwitchOpen(false, 'x'), false);
+  assert.equal(adSwitchOpen(true, ''), false);
+  assert.equal(adSwitchOpen(true, 'ad'), true);
+  assert.equal(boardSwitchOpen(false), false);
+  assert.equal(boardSwitchOpen(true), true);
+  assert.equal(shareSlotsLeft(emptyDaily('2026-10-27')), MAX_SHARE_BONUS);
+  const spent = grantShareBonus(grantShareBonus(emptyDaily('2026-10-27')).state).state;
+  assert.equal(shareSlotsLeft(spent), 0);
+  assert.ok(restartLine(2, true, '小火').includes('小火'));
+  assert.ok(restartLine(2, false, '试火').includes('仍是试火'));
+  assert.ok(restartLine(0, false, '试火', 1).includes('分享'));
+  assert.ok(restartLine(0, false, '试火', 0).includes('明天'));
 }
 
 function testBoot() {
@@ -795,6 +907,7 @@ testCollage();
 testName();
 testWords();
 testPaint();
+testFeel();
 testBoot();
 testHooks().then(() => {
   console.log('颠勺王测试通过');

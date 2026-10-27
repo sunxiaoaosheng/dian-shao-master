@@ -1,4 +1,4 @@
-import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatGoal, heatStart, nextPotLine } from './content/copy';
+import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatGoal, heatStart, nextPotLine, tossAck } from './content/copy';
 import { TOAST_LINES, pickToast } from './content/toasts';
 import { recipeForRun } from './content/recipes';
 import type { Recipe } from './content/recipes';
@@ -10,6 +10,7 @@ import {
   cooldownMsFor,
   createTossDetector,
   nextReadyAt,
+  tossFeel,
 } from './input/gyro';
 import type { SensitivityTier, TossDetector } from './input/gyro';
 import type { HeatId } from './meta/difficulty';
@@ -30,6 +31,7 @@ import {
   playsRemaining,
   rollDaily,
   serializeDaily,
+  shareSlotsLeft,
 } from './meta/daily';
 import type { DailyState } from './meta/daily';
 import { didGraduate, pickProfile } from './meta/difficulty';
@@ -164,6 +166,8 @@ class GameApp {
       safeBottom: this.platform.safeBottom,
       now: this.platform.now(),
       playsLeft: playsRemaining(this.daily),
+      shareLeft: shareSlotsLeft(this.daily),
+      runsCompleted: this.meta.runsCompleted,
       tier: this.meta.tier,
       heatId: this.session && this.screen !== 'home' ? this.session.heatId : upcoming.id,
       goalText: heatGoal(upcoming.id, upcoming.cols, upcoming.rows, upcoming.tossCharges),
@@ -273,8 +277,9 @@ class GameApp {
       return;
     }
     this.tossReadyAt = nextReadyAt(now, this.meta.tier);
-    this.shake = 1;
+    this.shake = tossFeel(this.meta.tier).shake;
     this.platform.vibrate();
+    this.toast(tossAck(this.meta.tier));
     this.toast(pickToast(now).text);
     this.captureMoment(source === 'gyro' ? 1 : 0.65);
     this.consumeEvents(result.events);
