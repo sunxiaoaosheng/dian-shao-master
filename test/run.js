@@ -3,6 +3,16 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { installManifest, MANIFEST_PATHS } = require('../loadManifest');
+
+const manifestJsonPath = path.join(__dirname, '../assets/manifest.json');
+let manifestReads = [];
+installManifest((filePath, encoding) => {
+  manifestReads.push([filePath, encoding]);
+  if (filePath !== MANIFEST_PATHS[0]) throw new Error(`清单路径应从代码包根目录写，收到 ${filePath}`);
+  if (encoding !== 'utf8') throw new Error(`清单编码应为 utf8，收到 ${encoding}`);
+  return fs.readFileSync(manifestJsonPath, 'utf8');
+});
 
 const { resolveMerges } = require('../dist/core/merge');
 const { createSession, place, tick, applyToss, clearCell } = require('../dist/core/session');
@@ -443,7 +453,17 @@ function pngInfo(buf) {
 }
 
 function testCollage() {
-  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '../assets/manifest.json'), 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(manifestJsonPath, 'utf8'));
+  assert.deepEqual(manifestReads, [['/assets/manifest.json', 'utf8']]);
+  const manifestJs = fs.readFileSync(path.join(__dirname, '../dist/content/manifest.js'), 'utf8');
+  assert.ok(!/require\([^)]*\.json/.test(manifestJs), '清单不能再被 require');
+  const gameJs = fs.readFileSync(path.join(__dirname, '../game.js'), 'utf8');
+  assert.ok(gameJs.includes('getFileSystemManager'));
+  assert.ok(gameJs.includes('readFileSync'));
+  assert.ok(!/require\([^)]*manifest\.json/.test(gameJs));
+  assert.throws(() => installManifest(() => {
+    throw new Error('no such file');
+  }));
   assert.equal(manifest.version, 1);
   assert.equal(MANIFEST_VERSION, 1);
   assert.equal(ASSETS.length, manifest.items.length);

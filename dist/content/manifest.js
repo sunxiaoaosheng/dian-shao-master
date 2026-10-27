@@ -2,13 +2,30 @@
 /**
  * 剪贴清单。运行时只认 assets/manifest.json 里的 id、path、pivot、z。
  * path 相对 assets/，占位图就在对应文件上。
+ *
+ * 小游戏不能 require 这个 json。game.js 用文件系统从代码包根目录读入，
+ * 放到全局 __DIANSHAO_MANIFEST__，这里只取已经读好的对象。
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ASSETS = exports.LAYERS = exports.SCALE_DEFAULT = exports.MANIFEST_VERSION = void 0;
 exports.assetById = assetById;
 exports.assetsByPrefix = assetsByPrefix;
 exports.foodIdForLevel = foodIdForLevel;
-const raw = require('../../assets/manifest.json');
+const MANIFEST_KEY = '__DIANSHAO_MANIFEST__';
+function installedManifest() {
+    const slots = [];
+    if (typeof globalThis !== 'undefined')
+        slots.push(globalThis);
+    if (typeof GameGlobal !== 'undefined')
+        slots.push(GameGlobal);
+    for (let i = 0; i < slots.length; i += 1) {
+        const raw = slots[i][MANIFEST_KEY];
+        if (raw && typeof raw === 'object')
+            return raw;
+    }
+    throw new Error('剪贴清单还没读入。入口要先读代码包根目录的 assets/manifest.json');
+}
+const raw = installedManifest();
 function readItems(file) {
     const items = [];
     const seen = new Set();

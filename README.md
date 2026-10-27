@@ -13,7 +13,7 @@
 3. AppID 用测试号 **`wx2ffe6f213fe9c05b`**。`project.config.json` 里已经写上，`isGameTourist` 为 `false`。导入时选这个 AppID，不要改成游客测试号。
 4. 基础库按项目里的 `3.5.5` 即可，工具若提示升级，跟工具走。动作传感器需要较新的基础库，`2.3.0` 以上才有 `wx.startDeviceMotionListening`。
 5. 模拟器可以直接玩。模拟器没有真陀螺仪，底部会出现 **手动颠勺**。
-6. 改了 `src/` 之后要重新编译（见下文）。仓库里已经提交了 `dist/`，导入后不必先装依赖就能预览。
+6. 改了 `src/` 或拉到新提交之后，在开发者工具里点 **编译** 再预览。仓库里已经提交了 `dist/`，导入后不必先装依赖。清单 `assets/manifest.json` 由 `game.js` 用文件系统从项目根读取，不要用 `require` 去加载这个 json。
 
 界面句子在 `src/content/copy.ts`。八句手写吐槽在 `src/content/toasts.ts`，和 `assets/manifest.json` 里的 `type.toast.*` 是同一句。剪贴规格见 `docs/COLLAGE_ART_SPEC.md`。缺的实拍图用占位 PNG 和矢量灶台，不挡开炒。
 
@@ -48,7 +48,9 @@
 | `src/content/recipes.ts` | 菜谱树 |
 | `src/content/copy.ts` | 中文界面文案 |
 | `src/content/toasts.ts` | 八句手写吐槽 |
-| `src/content/manifest.ts` | 读取 `assets/manifest.json` 的 id、路径、锚点、层级 |
+| `src/content/manifest.ts` | 使用已读入的清单：id、路径、锚点、层级 |
+| `loadManifest.js` | 从代码包根目录读 `assets/manifest.json` |
+| `game.js` | 小游戏入口。先读清单，再 `require('./dist/main.js')` |
 | `src/ui/` | 剪贴风画布；按清单 z 叠放，图没加载完时退回矢量 |
 | `assets/manifest.json` | 剪贴清单。占位图路径相对 `assets/` |
 | `assets/` | `ui` / `food` / `fx` / `type` 占位 PNG，正式图换文件不改名 |
@@ -64,7 +66,6 @@
 | `src/viral/shareCard.ts` | 5:4 分享卡 |
 | `src/platform/wechat/` | `wx` 适配：画布、存储、传感器、分享 |
 | `dist/` | `tsc` 按原模块边界编译出的 JS，不是单文件包 |
-| `game.js` | 小游戏入口，只负责 `require('./dist/main.js')` |
 
 ## 这口锅怎么打
 
