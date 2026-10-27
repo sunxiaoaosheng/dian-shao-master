@@ -1,13 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CARD_H = exports.CARD_W = void 0;
+exports.SHARE_STICKER_ID = exports.CARD_H = exports.CARD_W = void 0;
 exports.paintShareCard = paintShareCard;
 const copy_1 = require("../content/copy");
+const manifest_1 = require("../content/manifest");
 const draw_1 = require("../ui/draw");
+const sprites_1 = require("../ui/sprites");
 const theme_1 = require("../ui/theme");
 /** 分享图用 5:4，避免会话里把竖图裁坏。文案跟片段是同一下颠勺。 */
 exports.CARD_W = 500;
 exports.CARD_H = 400;
+/** 分享卡上的吐槽贴纸。缺图时仍画矢量字，不挡分享。 */
+exports.SHARE_STICKER_ID = 'type.toast.5';
 function paintShareCard(ctx, moment) {
     (0, draw_1.paintPaper)(ctx, exports.CARD_W, exports.CARD_H);
     ctx.save();
@@ -19,6 +23,8 @@ function paintShareCard(ctx, moment) {
     ctx.textBaseline = 'top';
     ctx.font = (0, theme_1.font)(28, true);
     ctx.fillText(copy_1.COPY.title, 210, 48);
+    const sticker = (0, manifest_1.assetById)(exports.SHARE_STICKER_ID);
+    (0, sprites_1.drawSprite)(ctx, sticker.id, 300, 250, 150, 36);
     ctx.font = (0, theme_1.font)(18, true);
     ctx.fillStyle = theme_1.PALETTE.chiliDeep;
     const dish = moment.dish || '这口锅';

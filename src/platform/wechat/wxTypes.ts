@@ -69,6 +69,19 @@ export interface WechatMiniGame {
     success?: () => void;
     fail?: () => void;
   }): void;
+  createRewardedVideoAd?(opts: { adUnitId: string }): WxRewardedVideoAd;
+  cloud?: {
+    callFunction(opts: { name: string; data?: Record<string, unknown> }): Promise<{ result?: unknown }>;
+  };
+}
+
+/** 对齐 wx.createRewardedVideoAd 返回值。 */
+export interface WxRewardedVideoAd {
+  load(): Promise<void>;
+  show(): Promise<void>;
+  onLoad(cb: () => void): void;
+  onError(cb: (err: { errMsg?: string; errCode?: number }) => void): void;
+  onClose(cb: (res?: { isEnded?: boolean }) => void): void;
 }
 
 export interface WxListenOpts {

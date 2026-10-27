@@ -34,4 +34,14 @@ export interface Platform {
   launchQuery(): Record<string, string>;
   /** 右上角菜单分享。不发加锅，避免玩家只是点开菜单就被算成自愿分享。 */
   setMenuShare(payload: { title: string; query?: string }): void;
+  /** 对齐 wx.createRewardedVideoAd。基础库没有这个方法时返回 null。 */
+  createRewardedVideoAd(adUnitId: string): {
+    load(): Promise<void>;
+    show(): Promise<void>;
+    onLoad(cb: () => void): void;
+    onError(cb: (err: { errMsg?: string; errCode?: number }) => void): void;
+    onClose(cb: (res?: { isEnded?: boolean }) => void): void;
+  } | null;
+  /** 对齐 wx.cloud.callFunction，只把 result 交回去。 */
+  callCloud(name: string, data?: Record<string, unknown>): Promise<unknown>;
 }

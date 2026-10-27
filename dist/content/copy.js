@@ -3,6 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TIER_NAME = exports.HEAT_NAME = exports.COPY = void 0;
 exports.playsLeftLabel = playsLeftLabel;
 exports.heatStart = heatStart;
+exports.heatGoal = heatGoal;
+exports.nextPotLine = nextPotLine;
+exports.againLabel = againLabel;
+exports.restartLine = restartLine;
 exports.cardBody = cardBody;
 exports.cardToast = cardToast;
 exports.scoreLabel = scoreLabel;
@@ -11,6 +15,7 @@ exports.tossedLabel = tossedLabel;
 exports.roundRecap = roundRecap;
 exports.cooldownLabel = cooldownLabel;
 exports.pickLine = pickLine;
+const difficulty_1 = require("../meta/difficulty");
 /** 所有玩家能看见的句子都放这里，方便对着厨房口吻改，也方便测试挡住跑题的词。 */
 exports.COPY = {
     title: '颠勺王',
@@ -22,7 +27,7 @@ exports.COPY = {
     shareButton: '给同乡看一眼（自愿，再领一锅）',
     shareHome: '自愿分享，多一锅',
     saveClip: '保存这一颠（9:16）',
-    adButton: '看火候广告再领一锅（待接）',
+    adButton: '看火候广告再领一锅',
     toss: '手动颠勺',
     noPlays: '今天的免费锅用完了',
     playsHint: '每天 3 锅免费。分享自愿，不分享也能明天再来。',
@@ -51,7 +56,8 @@ exports.COPY = {
     warn: '要糊了，颠一下',
     burntPiece: '有一块糊边了',
     tierTitle: '颠勺手感',
-    boardTitle: '各地灶口（本地示例）',
+    boardTitle: '各地灶口',
+    boardOff: '各地灶口还没接上。',
     albumTitle: '招牌菜册',
     albumEmpty: '还没颠出来',
     meter: '火候',
@@ -82,6 +88,28 @@ function playsLeftLabel(n) {
 }
 function heatStart(name) {
     return `这锅是${name}`;
+}
+function heatGoal(id, cols, rows, charges) {
+    if (id === 'tutorial') {
+        const seconds = Math.round(difficulty_1.GRADUATION_MS / 1000);
+        return `出师：合成 ${difficulty_1.GRADUATION_MERGES} 次，或撑过 ${seconds} 秒。否则下一锅仍是试火。`;
+    }
+    return `${exports.HEAT_NAME[id]}：${cols}×${rows} 锅，还能颠 ${charges} 下。落子和糊边都比上一火赶。`;
+}
+function nextPotLine(graduated, heatName) {
+    if (graduated)
+        return `下一锅是${heatName}，火更赶。`;
+    return `这口还没出师，再炒仍是${heatName}。`;
+}
+function againLabel(graduated, heatName) {
+    if (graduated)
+        return `炒下一火 · ${heatName}`;
+    return `再试这一火 · ${heatName}`;
+}
+function restartLine(playsLeft, graduated, heatName) {
+    if (playsLeft <= 0)
+        return exports.COPY.noPlays;
+    return nextPotLine(graduated, heatName);
 }
 function cardBody(name) {
     return `招牌「${name}」夹进手账了。`;

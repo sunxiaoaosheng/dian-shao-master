@@ -1,5 +1,5 @@
 import type { SensitivityTier } from '../input/gyro';
-import type { HeatId } from '../meta/difficulty';
+import { GRADUATION_MERGES, GRADUATION_MS, type HeatId } from '../meta/difficulty';
 
 /** 所有玩家能看见的句子都放这里，方便对着厨房口吻改，也方便测试挡住跑题的词。 */
 export const COPY = {
@@ -12,7 +12,7 @@ export const COPY = {
   shareButton: '给同乡看一眼（自愿，再领一锅）',
   shareHome: '自愿分享，多一锅',
   saveClip: '保存这一颠（9:16）',
-  adButton: '看火候广告再领一锅（待接）',
+  adButton: '看火候广告再领一锅',
   toss: '手动颠勺',
   noPlays: '今天的免费锅用完了',
   playsHint: '每天 3 锅免费。分享自愿，不分享也能明天再来。',
@@ -41,7 +41,8 @@ export const COPY = {
   warn: '要糊了，颠一下',
   burntPiece: '有一块糊边了',
   tierTitle: '颠勺手感',
-  boardTitle: '各地灶口（本地示例）',
+  boardTitle: '各地灶口',
+  boardOff: '各地灶口还没接上。',
   albumTitle: '招牌菜册',
   albumEmpty: '还没颠出来',
   meter: '火候',
@@ -76,6 +77,29 @@ export function playsLeftLabel(n: number): string {
 
 export function heatStart(name: string): string {
   return `这锅是${name}`;
+}
+
+export function heatGoal(id: HeatId, cols: number, rows: number, charges: number): string {
+  if (id === 'tutorial') {
+    const seconds = Math.round(GRADUATION_MS / 1000);
+    return `出师：合成 ${GRADUATION_MERGES} 次，或撑过 ${seconds} 秒。否则下一锅仍是试火。`;
+  }
+  return `${HEAT_NAME[id]}：${cols}×${rows} 锅，还能颠 ${charges} 下。落子和糊边都比上一火赶。`;
+}
+
+export function nextPotLine(graduated: boolean, heatName: string): string {
+  if (graduated) return `下一锅是${heatName}，火更赶。`;
+  return `这口还没出师，再炒仍是${heatName}。`;
+}
+
+export function againLabel(graduated: boolean, heatName: string): string {
+  if (graduated) return `炒下一火 · ${heatName}`;
+  return `再试这一火 · ${heatName}`;
+}
+
+export function restartLine(playsLeft: number, graduated: boolean, heatName: string): string {
+  if (playsLeft <= 0) return COPY.noPlays;
+  return nextPotLine(graduated, heatName);
 }
 
 export function cardBody(name: string): string {

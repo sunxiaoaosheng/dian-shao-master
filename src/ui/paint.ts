@@ -81,7 +81,7 @@ function paintHomeText(ctx: Ctx, vm: ViewModel): void {
     ctx.font = font(13, true);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(`${COPY.tierTitle} · 下锅是${vm.heatLabel}`, 20, tierButton.y - 18);
+    drawWrapped(ctx, `${COPY.tierTitle} · 下锅是${vm.heatLabel}。${vm.goalText}`, 20, tierButton.y - 36, vm.width - 40, 16);
   }
 
   paintButtonLabels(ctx, vm);
@@ -97,6 +97,10 @@ function paintHomeText(ctx: Ctx, vm: ViewModel): void {
     ctx.textAlign = 'left';
     ctx.fillText(vm.boardTitle, 20, vm.boardTop);
     ctx.font = font(13, false);
+    if (!vm.board.length) {
+      ctx.fillStyle = PALETTE.inkSoft;
+      drawWrapped(ctx, vm.boardNote, 20, vm.boardTop + 22, vm.width - 40, 18);
+    }
     for (let i = 0; i < vm.board.length; i += 1) {
       const row = vm.board[i];
       ctx.fillStyle = PALETTE.chiliDeep;
@@ -249,6 +253,11 @@ function paintPlayText(ctx: Ctx, vm: ViewModel): void {
   drawWrapped(ctx, note, noteX, play.nextBox.y, Math.max(80, noteW), 16);
   ctx.fillStyle = PALETTE.inkSoft;
   ctx.fillText(play.tossedText, noteX, play.nextBox.y + 36);
+  if (play.goalText) {
+    ctx.fillStyle = PALETTE.ink;
+    ctx.font = font(12, true);
+    drawWrapped(ctx, play.goalText, noteX, play.nextBox.y - 34, Math.max(80, noteW), 16);
+  }
   if (play.cooldownText) {
     ctx.fillStyle = PALETTE.chiliDeep;
     ctx.fillText(play.cooldownText, noteX, play.nextBox.y + 52);
@@ -291,7 +300,7 @@ function paintResult(ctx: Ctx, vm: ViewModel): void {
   if (!result) return;
   ctx.save();
   ctx.translate(20, 28);
-  fillTorn(ctx, vm.width - 40, 196, 21, PALETTE.white, 0.05);
+  fillTorn(ctx, vm.width - 40, 220, 21, PALETTE.white, 0.05);
   ctx.fillStyle = PALETTE.chiliDeep;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -302,10 +311,13 @@ function paintResult(ctx: Ctx, vm: ViewModel): void {
   ctx.fillText(result.scoreText, 18, 58);
   ctx.font = font(14, true);
   ctx.fillStyle = PALETTE.ink;
-  ctx.fillText(result.recap, 18, 84);
+  ctx.fillText(result.recap, 18, 82);
+  ctx.font = font(14, true);
+  ctx.fillStyle = PALETTE.chiliDeep;
+  drawWrapped(ctx, result.nextLine, 18, 104, vm.width - 78, 18);
   ctx.font = font(15, false);
   ctx.fillStyle = PALETTE.inkSoft;
-  drawWrapped(ctx, result.body, 18, 108, vm.width - 78, 22);
+  drawWrapped(ctx, result.body, 18, 142, vm.width - 78, 22);
   ctx.restore();
 }
 

@@ -3,10 +3,13 @@ import {
   COPY,
   HEAT_NAME,
   TIER_NAME,
+  againLabel,
   cardBody,
   chargesLabel,
   cooldownLabel,
+  heatGoal,
   playsLeftLabel,
+  restartLine,
   roundRecap,
   scoreLabel,
   tossedLabel,
@@ -20,7 +23,7 @@ import type { HitRect } from '../input/pointer';
 import type { AlbumState } from '../meta/cards';
 import type { FailReason } from '../core/types';
 import type { HeatId } from '../meta/difficulty';
-import type { RegionChef } from '../meta/leaderboard';
+import type { BoardEntry } from '../meta/leaderboard';
 import type { AlbumCardVM, ButtonVM, ScreenId, ViewModel } from './types';
 
 export interface ToastState {
@@ -43,7 +46,9 @@ export interface ComposeInput {
   recipe: Recipe | null;
   session: Session | null;
   album: AlbumState;
-  board: RegionChef[];
+  board: BoardEntry[];
+  goalText: string;
+  adsOn: boolean;
   toasts: ToastState[];
   showTossButton: boolean;
   sensorLabel: string;
@@ -55,6 +60,8 @@ export interface ComposeInput {
     merges: number;
     tosses: number;
     quip: string;
+    graduated: boolean;
+    nextHeatId: HeatId;
   } | null;
   /** 颠勺手感冷却还剩的毫秒。0 表示这下可以颠。 */
   tossWaitMs: number;
@@ -77,6 +84,7 @@ export function composeView(input: ComposeInput): ViewModel {
     playsLabel: playsLeftLabel(input.playsLeft),
     playsHint: COPY.playsHint,
     heatLabel: HEAT_NAME[input.heatId],
+    goalText: input.goalText,
     sensorLabel: input.sensorLabel,
     buttons: [],
     hits: [],
@@ -87,6 +95,7 @@ export function composeView(input: ComposeInput): ViewModel {
       line: `${row.chef} · ${row.dish}`,
     })),
     boardTitle: COPY.boardTitle,
+    boardNote: input.board.length ? '' : COPY.boardOff,
     showBoard: false,
     boardTop: 0,
     seal: null,
@@ -131,8 +140,8 @@ function layoutHome(input: ComposeInput, vm: ViewModel): void {
     { id: 'start', label: COPY.start, primary: true, disabled: input.playsLeft <= 0 },
     { id: 'share', label: COPY.shareHome, primary: false, disabled: false },
     { id: 'album', label: COPY.album, primary: false, disabled: false },
-    { id: 'ad', label: COPY.adButton, primary: false, disabled: false },
   ];
+  if (input.adsOn) stack.push({ id: 'ad', label: COPY.adButton, primary: false, disabled: false });
   for (let i = 0; i < stack.length; i += 1) {
     const item = stack[i];
     vm.buttons.push(button(item.id, item.label, pad, y, bw, 46, item.primary, item.disabled, false));
@@ -207,6 +216,7 @@ function layoutPlay(input: ComposeInput, vm: ViewModel): void {
     showTossButton: input.showTossButton,
     overflowText: overflow === null ? '' : COPY.overflow,
     hint: session.hint && session.merges === 0 ? COPY.hint : '',
+    goalText: heatGoal(session.heatId, session.cols, session.rows, session.maxCharges),
     wok: { x: gx - 18, y: gy - 8, w: gridW + 36, h: gridH + 22 },
     nextBox: { x: 16, y: input.height - input.safeBottom - 92, w: 68, h: 76 },
   };
@@ -237,15 +247,18 @@ function layoutResult(input: ComposeInput, vm: ViewModel): void {
     body: `${detail}${quip}${card}`,
     scoreText: scoreLabel(result ? result.score : 0),
     recap: result ? roundRecap(result.seconds, result.merges, result.tosses) : '',
+    nextLine: result ? restartLine(input.playsLeft, result.graduated, HEAT_NAME[result.nextHeatId]) : '',
   };
   const pad = 18;
   const bw = input.width - pad * 2;
-  let y = input.safeTop + 236;
+  let y = input.safeTop + 258;
   const stack: { id: string; label: string; primary: boolean }[] = [];
-  if (input.playsLeft > 0) stack.push({ id: 'again', label: COPY.again, primary: true });
+  if (input.playsLeft > 0 && result) {
+    stack.push({ id: 'again', label: againLabel(result.graduated, HEAT_NAME[result.nextHeatId]), primary: true });
+  }
   if (input.canSave) stack.push({ id: 'save', label: COPY.saveClip, primary: false });
   stack.push({ id: 'share', label: COPY.shareButton, primary: false });
-  stack.push({ id: 'ad', label: COPY.adButton, primary: false });
+  if (input.adsOn) stack.push({ id: 'ad', label: COPY.adButton, primary: false });
   stack.push({ id: 'home', label: COPY.back, primary: false });
   for (let i = 0; i < stack.length; i += 1) {
     const item = stack[i];

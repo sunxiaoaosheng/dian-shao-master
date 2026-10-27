@@ -1,9 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HEAT = void 0;
+exports.HEAT = exports.GRADUATION_MS = exports.GRADUATION_MERGES = void 0;
+exports.didGraduate = didGraduate;
 exports.pickProfile = pickProfile;
+/** 试火出师：合成够次数，或这口撑过这么久，或收了招牌。否则下一锅仍是试火。 */
+exports.GRADUATION_MERGES = 1;
+exports.GRADUATION_MS = 20000;
+function didGraduate(merges, elapsedMs, cards) {
+    return merges >= exports.GRADUATION_MERGES || elapsedMs >= exports.GRADUATION_MS || cards > 0;
+}
 /**
- * 第一锅试火很松，连着打完就会掉进地狱火。
+ * 第一锅试火很松。出师之后小火、中火、地狱火一档比一档赶。
  * 数值只放这里，玩法代码按档位读，不要在别处再写一套。
  */
 exports.HEAT = [
@@ -26,14 +33,14 @@ exports.HEAT = [
     },
     {
         id: 'simmer',
-        spawnIntervalMs: 1800,
-        spawnFloor: 1100,
-        baseBurnMs: 8000,
-        burnPerLevelMs: 1800,
-        passivePerSec: 2.6,
-        burnChunk: 12,
+        spawnIntervalMs: 1500,
+        spawnFloor: 900,
+        baseBurnMs: 6000,
+        burnPerLevelMs: 1400,
+        passivePerSec: 4.4,
+        burnChunk: 16,
         tossCharges: 3,
-        tossRelief: 26,
+        tossRelief: 22,
         cols: 4,
         rows: 5,
         heatRampEvery: 4,

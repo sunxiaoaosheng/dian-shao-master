@@ -81,6 +81,15 @@ export function createWechatPlatform(): Platform {
         return {};
       }
     },
+    createRewardedVideoAd: (adUnitId) => {
+      if (!wx.createRewardedVideoAd || !adUnitId) return null;
+      return wx.createRewardedVideoAd({ adUnitId });
+    },
+    callCloud: (name, data) => {
+      const cloud = wx.cloud;
+      if (!cloud || !cloud.callFunction) return Promise.reject(new Error('cloud'));
+      return cloud.callFunction({ name, data }).then((res) => (res ? res.result : null));
+    },
     setMenuShare: (payload) => {
       try {
         if (wx.showShareMenu) wx.showShareMenu({ withShareTicket: false, menus: ['shareAppMessage'] });

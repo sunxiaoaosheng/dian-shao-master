@@ -55,18 +55,25 @@ class GameApp {
         this.lastMoment = null;
         this.lastClipPath = null;
         this.result = null;
+        this.board = [];
         this.platform = platform;
         const today = (0, daily_1.formatDay)(platform.now());
         this.daily = (0, daily_1.rollDaily)((0, daily_1.parseDaily)(platform.storageGet(keys_1.KEY_DAILY)), today);
         this.album = (0, cards_1.parseAlbum)(platform.storageGet(keys_1.KEY_ALBUM));
         this.meta = (0, progress_1.parseMeta)(platform.storageGet(keys_1.KEY_META));
         this.detector = (0, gyro_1.createTossDetector)(this.meta.tier);
-        this.ad = (0, ads_1.createReservedRewardedAd)();
+        this.ad = (0, ads_1.createRewardedAd)({
+            enabled: ads_1.ADS_ENABLED,
+            adUnitId: ads_1.REWARDED_AD_UNIT_ID,
+            create: () => platform.createRewardedVideoAd(ads_1.REWARDED_AD_UNIT_ID),
+        });
+        this.refreshBoard();
         if (platform.launchQuery().qa === '1')
             this.qaMode = true;
         platform.onPointer((point) => this.onPointer(point.x, point.y));
         platform.onShow(() => {
             this.refreshDate();
+            this.refreshBoard();
             if (this.screen === 'play')
                 this.beginSensors();
         });
@@ -103,7 +110,7 @@ class GameApp {
     }
     snapshot() {
         const peek = this.detector.peek();
-        const nextHeat = (0, difficulty_1.pickProfile)(this.meta.runsCompleted).id;
+        const upcoming = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
         return {
             screen: this.screen,
             width: this.platform.width,
@@ -113,11 +120,13 @@ class GameApp {
             now: this.platform.now(),
             playsLeft: (0, daily_1.playsRemaining)(this.daily),
             tier: this.meta.tier,
-            heatId: this.session && this.screen !== 'home' ? this.session.heatId : nextHeat,
+            heatId: this.session && this.screen !== 'home' ? this.session.heatId : upcoming.id,
+            goalText: (0, copy_1.heatGoal)(upcoming.id, upcoming.cols, upcoming.rows, upcoming.tossCharges),
+            adsOn: this.ad.isConfigured(),
             recipe: this.recipe,
             session: this.session,
             album: this.album,
-            board: (0, leaderboard_1.getRegionalBoard)(),
+            board: this.board,
             toasts: this.toasts,
             showTossButton: this.platform.isDevtools || this.sensorPhase !== 'live',
             sensorLabel: this.sensorLabel(),
@@ -415,10 +424,12 @@ class GameApp {
             return;
         this.ended = true;
         const session = this.session;
-        if (session.merges >= 1 || session.elapsedMs >= 20000 || session.cardsThisRun > 0) {
+        const graduated = (0, difficulty_1.didGraduate)(session.merges, session.elapsedMs, session.cardsThisRun);
+        if (graduated) {
             this.meta.runsCompleted += 1;
             this.saveMeta();
         }
+        const next = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
         const quip = reason === 'burnt_out' ? toasts_1.TOAST_LINES[6].text : toasts_1.TOAST_LINES[4].text;
         const seconds = Math.max(1, Math.round(session.elapsedMs / 1000));
         this.result = {
@@ -429,9 +440,12 @@ class GameApp {
             merges: session.merges,
             tosses: session.tossCount,
             quip,
+            graduated,
+            nextHeatId: next.id,
         };
         this.screen = 'result';
         this.toast(quip, 3400);
+        this.toast((0, copy_1.nextPotLine)(graduated, copy_1.HEAT_NAME[next.id]), 3400);
         this.sensorGen += 1;
         this.platform.stopSensors();
     }
@@ -464,6 +478,15 @@ class GameApp {
         if (this.sensorPhase === 'live')
             return copy_1.COPY.sensorLive;
         return copy_1.COPY.sensorPending;
+    }
+    refreshBoard() {
+        if (!leaderboard_1.BOARD_ENABLED) {
+            this.board = [];
+            return;
+        }
+        void (0, leaderboard_1.fetchRegionalBoard)((name, data) => this.platform.callCloud(name, data)).then((rows) => {
+            this.board = rows;
+        });
     }
     toast(text, lifeMs = 1700) {
         const now = this.platform.now();

@@ -1,21 +1,45 @@
-export interface RegionChef {
+/**
+ * 地区灶口榜。形状对齐 wx.cloud.callFunction({ name, data })。
+ * BOARD_ENABLED 关掉时不请求，也不填示例名。
+ * TODO(owner)：云函数 regionalBoard 能返回 { list: [{ region, chef, dish, heat }] } 后，把 BOARD_ENABLED 改成 true。
+ */
+
+export const BOARD_ENABLED = false;
+export const BOARD_FUNCTION_NAME = 'regionalBoard';
+
+export interface BoardEntry {
   region: string;
   chef: string;
   dish: string;
   heat: number;
 }
 
-/**
- * 地区厨子榜。
- * TODO(owner): 换成微信云开发或自建接口，按地区汇总招牌菜。
- * 现在返回本地示例，模块边界先留住，不要把名单写进界面文件。
- */
-export function getRegionalBoard(): RegionChef[] {
-  return [
-    { region: '川渝', chef: '油渣张', dish: '回锅肉', heat: 98 },
-    { region: '岭南', chef: '煲仔李', dish: '煲仔饭', heat: 91 },
-    { region: '江南', chef: '糖醋周', dish: '糖醋排骨', heat: 86 },
-    { region: '西北', chef: '馍馍马', dish: '肉夹馍', heat: 84 },
-    { region: '东北', chef: '铁锅赵', dish: '锅包肉', heat: 80 },
-  ];
+export type CloudCall = (name: string, data?: Record<string, unknown>) => Promise<unknown>;
+
+export function readBoard(result: unknown): BoardEntry[] {
+  let rows: unknown[] = [];
+  if (Array.isArray(result)) rows = result;
+  else if (result && typeof result === 'object' && Array.isArray((result as { list?: unknown }).list)) {
+    rows = (result as { list: unknown[] }).list;
+  }
+  const out: BoardEntry[] = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (!row || typeof row !== 'object') continue;
+    const item = row as { region?: unknown; chef?: unknown; dish?: unknown; heat?: unknown };
+    if (typeof item.region !== 'string' || typeof item.dish !== 'string') continue;
+    out.push({
+      region: item.region,
+      chef: typeof item.chef === 'string' ? item.chef : '',
+      dish: item.dish,
+      heat: typeof item.heat === 'number' ? item.heat : 0,
+    });
+  }
+  return out;
+}
+
+/** 开关关掉或没有云函数时直接空列表，不会去调用 call。 */
+export function fetchRegionalBoard(call: CloudCall | null): Promise<BoardEntry[]> {
+  if (!BOARD_ENABLED || !call) return Promise.resolve([]);
+  return call(BOARD_FUNCTION_NAME, {}).then((result) => readBoard(result)).catch(() => []);
 }

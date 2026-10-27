@@ -20,9 +20,11 @@ const {
   MAX_SHARE_BONUS,
 } = require('../dist/meta/daily');
 const { emptyAlbum, grantCard } = require('../dist/meta/cards');
-const { createReservedRewardedAd, REWARDED_AD_UNIT_ID } = require('../dist/meta/ads');
-const { getRegionalBoard } = require('../dist/meta/leaderboard');
-const { COPY, roundRecap, cooldownLabel } = require('../dist/content/copy');
+const { createRewardedAd, ADS_ENABLED, REWARDED_AD_UNIT_ID } = require('../dist/meta/ads');
+const { fetchRegionalBoard, readBoard, BOARD_ENABLED, BOARD_FUNCTION_NAME } = require('../dist/meta/leaderboard');
+const { didGraduate, GRADUATION_MS, GRADUATION_MERGES } = require('../dist/meta/difficulty');
+const { COPY, roundRecap, cooldownLabel, againLabel, heatGoal } = require('../dist/content/copy');
+const { SHARE_STICKER_ID } = require('../dist/viral/shareCard');
 const { ASSETS, LAYERS, MANIFEST_VERSION, assetById, foodIdForLevel } = require('../dist/content/manifest');
 const { TOAST_LINES, toastImageFor } = require('../dist/content/toasts');
 const { loadCollage, resetCollageForTests, spriteReady, spriteOrigin, beginSprites, queueBox, flushSprites } = require('../dist/ui/sprites');
@@ -326,11 +328,21 @@ function testDaily() {
   assert.equal(next.playsUsed, 0);
   assert.equal(playsRemaining(next), FREE_PLAYS_PER_DAY);
   assert.equal(parseDaily('{').date, '1970-01-01');
-  assert.equal(createReservedRewardedAd().isConfigured(), false);
+  assert.equal(ADS_ENABLED, false);
   assert.equal(REWARDED_AD_UNIT_ID, '');
+  assert.equal(BOARD_ENABLED, false);
   assert.ok(COPY.shareButton.includes('自愿'));
   assert.ok(COPY.playsHint.includes('不分享'));
-  assert.equal(getRegionalBoard().length >= 4, true);
+  assert.equal(didGraduate(0, GRADUATION_MS - 1, 0), false);
+  assert.equal(didGraduate(GRADUATION_MERGES, 0, 0), true);
+  assert.equal(didGraduate(0, GRADUATION_MS, 0), true);
+  assert.equal(didGraduate(0, 0, 1), true);
+  assert.ok(HEAT[1].spawnIntervalMs < HEAT[0].spawnIntervalMs);
+  assert.ok(HEAT[1].passivePerSec > HEAT[0].passivePerSec);
+  assert.ok(HEAT[1].tossCharges < HEAT[0].tossCharges);
+  assert.ok(HEAT[2].spawnIntervalMs < HEAT[1].spawnIntervalMs);
+  assert.ok(HEAT[3].tossCharges < HEAT[2].tossCharges);
+  assert.ok(heatGoal('tutorial', 4, 5, 5).includes('20'));
   assert.equal(recipeForRun(0).id, RECIPES[0].id);
   assert.equal(pickProfile(0).id, 'tutorial');
   assert.equal(pickProfile(1).id, 'simmer');
@@ -599,7 +611,9 @@ function testPaint() {
     recipe,
     session,
     album: { cards: [{ recipeId: recipe.id, name: recipe.name, region: recipe.region, blurb: recipe.blurb, unlockedAt: 1 }] },
-    board: getRegionalBoard(),
+    board: [],
+    goalText: heatGoal('tutorial', 4, 5, 5),
+    adsOn: false,
     toasts: [{ text: '颠起来了！', seed: 3, born: 4000, until: 6000 }],
     showTossButton: true,
     sensorLabel: '模拟器没有真陀螺仪，先手动颠',
@@ -611,6 +625,8 @@ function testPaint() {
       merges: 2,
       tosses: 1,
       quip: '糊了也是烟火气。',
+      graduated: true,
+      nextHeatId: 'simmer',
     },
     tossWaitMs: 0,
     shake: 0.6,
@@ -635,6 +651,18 @@ function testPaint() {
   assert.ok(settled.result.recap.includes('合成 2'));
   assert.ok(settled.result.body.includes('糊了也是烟火气'));
   assert.equal(roundRecap(18, 2, 1), settled.result.recap);
+  assert.ok(settled.result.nextLine.includes('小火'));
+  assert.ok(settled.buttons.some((button) => button.id === 'again' && button.label === againLabel(true, '小火')));
+  assert.ok(!settled.buttons.some((button) => button.id === 'ad'));
+  const stay = composeView(Object.assign({}, base, {
+    screen: 'result',
+    result: Object.assign({}, base.result, { graduated: false, nextHeatId: 'tutorial' }),
+  }));
+  assert.ok(stay.result.nextLine.includes('仍是试火'));
+  assert.ok(stay.buttons.some((button) => button.label.indexOf('再试这一火') === 0));
+  assert.equal(assetById(SHARE_STICKER_ID).file, 'assets/type/type-toast-05.png');
+  assert.equal(CLIP_W, 540);
+  assert.equal(CLIP_H, 960);
   const cooling = composeView(Object.assign({}, base, { screen: 'play', tossWaitMs: 600 }));
   assert.ok(cooling.play.cooldownText.includes('0.6'));
   assert.equal(cooldownLabel('家常', 600), cooling.play.cooldownText);
@@ -694,6 +722,71 @@ function testBoot() {
   require('../dist/main.js');
 }
 
+function testHooks() {
+  let created = 0;
+  const off = createRewardedAd({
+    enabled: false,
+    adUnitId: 'ad-unit',
+    create: () => {
+      created += 1;
+      return null;
+    },
+  });
+  assert.equal(off.isConfigured(), false);
+  return off.show().then((offResult) => {
+    assert.equal(offResult, 'unavailable');
+    assert.equal(created, 0);
+    const watched = createRewardedAd({
+      enabled: true,
+      adUnitId: 'ad-unit',
+      create: () => ({
+        load: () => Promise.resolve(),
+        show() {
+          this.onClose({ isEnded: true });
+          return Promise.resolve();
+        },
+        onLoad() {},
+        onError() {},
+        onClose(cb) { this.onClose = cb; },
+      }),
+    });
+    return watched.show();
+  }).then((reward) => {
+    assert.equal(reward, 'reward');
+    const skipped = createRewardedAd({
+      enabled: true,
+      adUnitId: 'ad-unit',
+      create: () => ({
+        load: () => Promise.resolve(),
+        show() {
+          this.onClose({ isEnded: false });
+          return Promise.resolve();
+        },
+        onLoad() {},
+        onError() {},
+        onClose(cb) { this.onClose = cb; },
+      }),
+    });
+    return skipped.show();
+  }).then((skip) => {
+    assert.equal(skip, 'skip');
+    let called = 0;
+    return fetchRegionalBoard(() => {
+      called += 1;
+      return Promise.resolve([]);
+    }).then((rows) => {
+      assert.equal(BOARD_ENABLED, false);
+      assert.deepEqual(rows, []);
+      assert.equal(called, 0);
+      assert.equal(BOARD_FUNCTION_NAME, 'regionalBoard');
+      assert.deepEqual(readBoard({ list: [{ region: '川渝', dish: '回锅肉', heat: 3 }] }), [
+        { region: '川渝', chef: '', dish: '回锅肉', heat: 3 },
+      ]);
+      assert.deepEqual(readBoard({ list: [{ nope: true }] }), []);
+    });
+  });
+}
+
 testMerge();
 testSession();
 testDaily();
@@ -703,4 +796,9 @@ testName();
 testWords();
 testPaint();
 testBoot();
-console.log('颠勺王测试通过');
+testHooks().then(() => {
+  console.log('颠勺王测试通过');
+}).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -18,6 +18,7 @@ function composeView(input) {
         playsLabel: (0, copy_1.playsLeftLabel)(input.playsLeft),
         playsHint: copy_1.COPY.playsHint,
         heatLabel: copy_1.HEAT_NAME[input.heatId],
+        goalText: input.goalText,
         sensorLabel: input.sensorLabel,
         buttons: [],
         hits: [],
@@ -28,6 +29,7 @@ function composeView(input) {
             line: `${row.chef} · ${row.dish}`,
         })),
         boardTitle: copy_1.COPY.boardTitle,
+        boardNote: input.board.length ? '' : copy_1.COPY.boardOff,
         showBoard: false,
         boardTop: 0,
         seal: null,
@@ -74,8 +76,9 @@ function layoutHome(input, vm) {
         { id: 'start', label: copy_1.COPY.start, primary: true, disabled: input.playsLeft <= 0 },
         { id: 'share', label: copy_1.COPY.shareHome, primary: false, disabled: false },
         { id: 'album', label: copy_1.COPY.album, primary: false, disabled: false },
-        { id: 'ad', label: copy_1.COPY.adButton, primary: false, disabled: false },
     ];
+    if (input.adsOn)
+        stack.push({ id: 'ad', label: copy_1.COPY.adButton, primary: false, disabled: false });
     for (let i = 0; i < stack.length; i += 1) {
         const item = stack[i];
         vm.buttons.push(button(item.id, item.label, pad, y, bw, 46, item.primary, item.disabled, false));
@@ -149,6 +152,7 @@ function layoutPlay(input, vm) {
         showTossButton: input.showTossButton,
         overflowText: overflow === null ? '' : copy_1.COPY.overflow,
         hint: session.hint && session.merges === 0 ? copy_1.COPY.hint : '',
+        goalText: (0, copy_1.heatGoal)(session.heatId, session.cols, session.rows, session.maxCharges),
         wok: { x: gx - 18, y: gy - 8, w: gridW + 36, h: gridH + 22 },
         nextBox: { x: 16, y: input.height - input.safeBottom - 92, w: 68, h: 76 },
     };
@@ -168,17 +172,20 @@ function layoutResult(input, vm) {
         body: `${detail}${quip}${card}`,
         scoreText: (0, copy_1.scoreLabel)(result ? result.score : 0),
         recap: result ? (0, copy_1.roundRecap)(result.seconds, result.merges, result.tosses) : '',
+        nextLine: result ? (0, copy_1.restartLine)(input.playsLeft, result.graduated, copy_1.HEAT_NAME[result.nextHeatId]) : '',
     };
     const pad = 18;
     const bw = input.width - pad * 2;
-    let y = input.safeTop + 236;
+    let y = input.safeTop + 258;
     const stack = [];
-    if (input.playsLeft > 0)
-        stack.push({ id: 'again', label: copy_1.COPY.again, primary: true });
+    if (input.playsLeft > 0 && result) {
+        stack.push({ id: 'again', label: (0, copy_1.againLabel)(result.graduated, copy_1.HEAT_NAME[result.nextHeatId]), primary: true });
+    }
     if (input.canSave)
         stack.push({ id: 'save', label: copy_1.COPY.saveClip, primary: false });
     stack.push({ id: 'share', label: copy_1.COPY.shareButton, primary: false });
-    stack.push({ id: 'ad', label: copy_1.COPY.adButton, primary: false });
+    if (input.adsOn)
+        stack.push({ id: 'ad', label: copy_1.COPY.adButton, primary: false });
     stack.push({ id: 'home', label: copy_1.COPY.back, primary: false });
     for (let i = 0; i < stack.length; i += 1) {
         const item = stack[i];

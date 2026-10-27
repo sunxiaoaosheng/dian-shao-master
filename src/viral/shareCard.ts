@@ -1,12 +1,16 @@
 import { COPY } from '../content/copy';
+import { assetById } from '../content/manifest';
 import type { Ctx } from '../ui/ctx';
 import { drawPolaroid, fillTorn, paintPaper } from '../ui/draw';
+import { drawSprite } from '../ui/sprites';
 import { PALETTE, font } from '../ui/theme';
 import type { TossMoment } from './moment';
 
 /** 分享图用 5:4，避免会话里把竖图裁坏。文案跟片段是同一下颠勺。 */
 export const CARD_W = 500;
 export const CARD_H = 400;
+/** 分享卡上的吐槽贴纸。缺图时仍画矢量字，不挡分享。 */
+export const SHARE_STICKER_ID = 'type.toast.5';
 
 export function paintShareCard(ctx: Ctx, moment: TossMoment): void {
   paintPaper(ctx, CARD_W, CARD_H);
@@ -19,6 +23,8 @@ export function paintShareCard(ctx: Ctx, moment: TossMoment): void {
   ctx.textBaseline = 'top';
   ctx.font = font(28, true);
   ctx.fillText(COPY.title, 210, 48);
+  const sticker = assetById(SHARE_STICKER_ID);
+  drawSprite(ctx, sticker.id, 300, 250, 150, 36);
   ctx.font = font(18, true);
   ctx.fillStyle = PALETTE.chiliDeep;
   const dish = moment.dish || '这口锅';

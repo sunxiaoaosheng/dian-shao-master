@@ -46,6 +46,7 @@ export interface PlayVM {
   showTossButton: boolean;
   overflowText: string;
   hint: string;
+  goalText: string;
   wok: { x: number; y: number; w: number; h: number };
   nextBox: { x: number; y: number; w: number; h: number };
   cooldownText: string;
@@ -56,6 +57,7 @@ export interface ResultVM {
   body: string;
   scoreText: string;
   recap: string;
+  nextLine: string;
 }
 
 export interface AlbumCardVM {
@@ -82,7 +84,9 @@ export interface ViewModel {
   playsLabel: string;
   playsHint: string;
   heatLabel: string;
+  goalText: string;
   sensorLabel: string;
+  boardNote: string;
   buttons: ButtonVM[];
   hits: HitRect[];
   toasts: { text: string; seed: number; life: number }[];

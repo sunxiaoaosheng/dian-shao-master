@@ -77,7 +77,7 @@ function paintHomeText(ctx, vm) {
         ctx.font = (0, theme_1.font)(13, true);
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(`${copy_1.COPY.tierTitle} · 下锅是${vm.heatLabel}`, 20, tierButton.y - 18);
+        (0, draw_1.drawWrapped)(ctx, `${copy_1.COPY.tierTitle} · 下锅是${vm.heatLabel}。${vm.goalText}`, 20, tierButton.y - 36, vm.width - 40, 16);
     }
     paintButtonLabels(ctx, vm);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
@@ -91,6 +91,10 @@ function paintHomeText(ctx, vm) {
         ctx.textAlign = 'left';
         ctx.fillText(vm.boardTitle, 20, vm.boardTop);
         ctx.font = (0, theme_1.font)(13, false);
+        if (!vm.board.length) {
+            ctx.fillStyle = theme_1.PALETTE.inkSoft;
+            (0, draw_1.drawWrapped)(ctx, vm.boardNote, 20, vm.boardTop + 22, vm.width - 40, 18);
+        }
         for (let i = 0; i < vm.board.length; i += 1) {
             const row = vm.board[i];
             ctx.fillStyle = theme_1.PALETTE.chiliDeep;
@@ -232,6 +236,11 @@ function paintPlayText(ctx, vm) {
     (0, draw_1.drawWrapped)(ctx, note, noteX, play.nextBox.y, Math.max(80, noteW), 16);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
     ctx.fillText(play.tossedText, noteX, play.nextBox.y + 36);
+    if (play.goalText) {
+        ctx.fillStyle = theme_1.PALETTE.ink;
+        ctx.font = (0, theme_1.font)(12, true);
+        (0, draw_1.drawWrapped)(ctx, play.goalText, noteX, play.nextBox.y - 34, Math.max(80, noteW), 16);
+    }
     if (play.cooldownText) {
         ctx.fillStyle = theme_1.PALETTE.chiliDeep;
         ctx.fillText(play.cooldownText, noteX, play.nextBox.y + 52);
@@ -274,7 +283,7 @@ function paintResult(ctx, vm) {
         return;
     ctx.save();
     ctx.translate(20, 28);
-    (0, draw_1.fillTorn)(ctx, vm.width - 40, 196, 21, theme_1.PALETTE.white, 0.05);
+    (0, draw_1.fillTorn)(ctx, vm.width - 40, 220, 21, theme_1.PALETTE.white, 0.05);
     ctx.fillStyle = theme_1.PALETTE.chiliDeep;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -285,10 +294,13 @@ function paintResult(ctx, vm) {
     ctx.fillText(result.scoreText, 18, 58);
     ctx.font = (0, theme_1.font)(14, true);
     ctx.fillStyle = theme_1.PALETTE.ink;
-    ctx.fillText(result.recap, 18, 84);
+    ctx.fillText(result.recap, 18, 82);
+    ctx.font = (0, theme_1.font)(14, true);
+    ctx.fillStyle = theme_1.PALETTE.chiliDeep;
+    (0, draw_1.drawWrapped)(ctx, result.nextLine, 18, 104, vm.width - 78, 18);
     ctx.font = (0, theme_1.font)(15, false);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
-    (0, draw_1.drawWrapped)(ctx, result.body, 18, 108, vm.width - 78, 22);
+    (0, draw_1.drawWrapped)(ctx, result.body, 18, 142, vm.width - 78, 22);
     ctx.restore();
 }
 function paintAlbum(ctx, vm) {

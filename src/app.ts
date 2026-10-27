@@ -1,4 +1,4 @@
-import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatStart } from './content/copy';
+import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatGoal, heatStart, nextPotLine } from './content/copy';
 import { TOAST_LINES, pickToast } from './content/toasts';
 import { recipeForRun } from './content/recipes';
 import type { Recipe } from './content/recipes';
@@ -12,10 +12,11 @@ import {
   nextReadyAt,
 } from './input/gyro';
 import type { SensitivityTier, TossDetector } from './input/gyro';
+import type { HeatId } from './meta/difficulty';
 import { hitTest } from './input/pointer';
 import { SensorMux } from './input/sensors';
 import { runLoop } from './loop';
-import { createReservedRewardedAd } from './meta/ads';
+import { ADS_ENABLED, REWARDED_AD_UNIT_ID, createRewardedAd } from './meta/ads';
 import type { RewardedAdHook } from './meta/ads';
 import { grantCard, parseAlbum, serializeAlbum } from './meta/cards';
 import type { AlbumState } from './meta/cards';
@@ -31,9 +32,10 @@ import {
   serializeDaily,
 } from './meta/daily';
 import type { DailyState } from './meta/daily';
-import { pickProfile } from './meta/difficulty';
+import { didGraduate, pickProfile } from './meta/difficulty';
 import { KEY_ALBUM, KEY_DAILY, KEY_META } from './meta/keys';
-import { getRegionalBoard } from './meta/leaderboard';
+import { BOARD_ENABLED, fetchRegionalBoard } from './meta/leaderboard';
+import type { BoardEntry } from './meta/leaderboard';
 import { parseMeta, serializeMeta } from './meta/progress';
 import type { MetaState } from './meta/progress';
 import { shareQuery, shareTitle } from './meta/share';
@@ -95,7 +97,10 @@ class GameApp {
     merges: number;
     tosses: number;
     quip: string;
+    graduated: boolean;
+    nextHeatId: HeatId;
   } | null = null;
+  private board: BoardEntry[] = [];
 
   constructor(platform: Platform) {
     this.platform = platform;
@@ -104,12 +109,18 @@ class GameApp {
     this.album = parseAlbum(platform.storageGet(KEY_ALBUM));
     this.meta = parseMeta(platform.storageGet(KEY_META));
     this.detector = createTossDetector(this.meta.tier);
-    this.ad = createReservedRewardedAd();
+    this.ad = createRewardedAd({
+      enabled: ADS_ENABLED,
+      adUnitId: REWARDED_AD_UNIT_ID,
+      create: () => platform.createRewardedVideoAd(REWARDED_AD_UNIT_ID),
+    });
+    this.refreshBoard();
     if (platform.launchQuery().qa === '1') this.qaMode = true;
 
     platform.onPointer((point) => this.onPointer(point.x, point.y));
     platform.onShow(() => {
       this.refreshDate();
+      this.refreshBoard();
       if (this.screen === 'play') this.beginSensors();
     });
     platform.onHide(() => {
@@ -144,7 +155,7 @@ class GameApp {
 
   private snapshot() {
     const peek = this.detector.peek();
-    const nextHeat = pickProfile(this.meta.runsCompleted).id;
+    const upcoming = pickProfile(this.meta.runsCompleted);
     return {
       screen: this.screen,
       width: this.platform.width,
@@ -154,11 +165,13 @@ class GameApp {
       now: this.platform.now(),
       playsLeft: playsRemaining(this.daily),
       tier: this.meta.tier,
-      heatId: this.session && this.screen !== 'home' ? this.session.heatId : nextHeat,
+      heatId: this.session && this.screen !== 'home' ? this.session.heatId : upcoming.id,
+      goalText: heatGoal(upcoming.id, upcoming.cols, upcoming.rows, upcoming.tossCharges),
+      adsOn: this.ad.isConfigured(),
       recipe: this.recipe,
       session: this.session,
       album: this.album,
-      board: getRegionalBoard(),
+      board: this.board,
       toasts: this.toasts,
       showTossButton: this.platform.isDevtools || this.sensorPhase !== 'live',
       sensorLabel: this.sensorLabel(),
@@ -438,10 +451,12 @@ class GameApp {
     if (this.ended || !this.session) return;
     this.ended = true;
     const session = this.session;
-    if (session.merges >= 1 || session.elapsedMs >= 20000 || session.cardsThisRun > 0) {
+    const graduated = didGraduate(session.merges, session.elapsedMs, session.cardsThisRun);
+    if (graduated) {
       this.meta.runsCompleted += 1;
       this.saveMeta();
     }
+    const next = pickProfile(this.meta.runsCompleted);
     const quip = reason === 'burnt_out' ? TOAST_LINES[6].text : TOAST_LINES[4].text;
     const seconds = Math.max(1, Math.round(session.elapsedMs / 1000));
     this.result = {
@@ -452,9 +467,12 @@ class GameApp {
       merges: session.merges,
       tosses: session.tossCount,
       quip,
+      graduated,
+      nextHeatId: next.id,
     };
     this.screen = 'result';
     this.toast(quip, 3400);
+    this.toast(nextPotLine(graduated, HEAT_NAME[next.id]), 3400);
     this.sensorGen += 1;
     this.platform.stopSensors();
   }
@@ -484,6 +502,16 @@ class GameApp {
     if (this.sensorPhase === 'fallback') return COPY.sensorFallback;
     if (this.sensorPhase === 'live') return COPY.sensorLive;
     return COPY.sensorPending;
+  }
+
+  private refreshBoard(): void {
+    if (!BOARD_ENABLED) {
+      this.board = [];
+      return;
+    }
+    void fetchRegionalBoard((name, data) => this.platform.callCloud(name, data)).then((rows) => {
+      this.board = rows;
+    });
   }
 
   private toast(text: string, lifeMs = 1700): void {
