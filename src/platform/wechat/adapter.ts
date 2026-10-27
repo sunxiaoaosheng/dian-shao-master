@@ -47,6 +47,7 @@ export function createWechatPlatform(): Platform {
     safeTop,
     safeBottom,
     now: () => Date.now(),
+    appId: () => readAppId(wx),
     onPointer: (cb) => {
       pointer = cb;
     },
@@ -107,6 +108,16 @@ export function createWechatPlatform(): Platform {
       }
     },
   };
+}
+
+function readAppId(wx: WechatMiniGame): string {
+  try {
+    const info = wx.getAccountInfoSync ? wx.getAccountInfoSync() : undefined;
+    const id = info && info.miniProgram ? info.miniProgram.appId : '';
+    return typeof id === 'string' ? id : '';
+  } catch {
+    return '';
+  }
 }
 
 function getWx(): WechatMiniGame {

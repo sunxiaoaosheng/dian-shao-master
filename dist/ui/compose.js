@@ -17,7 +17,7 @@ function composeView(input) {
         title: copy_1.COPY.title,
         subtitle: copy_1.COPY.subtitle,
         playsLabel: (0, copy_1.playsLeftLabel)(input.playsLeft),
-        playsHint: copy_1.COPY.playsHint,
+        playsHint: input.playsHint,
         heatLabel: copy_1.HEAT_NAME[input.heatId],
         goalText: input.goalText,
         feelText: (0, copy_1.tossFeelLine)(input.tier),
@@ -76,10 +76,13 @@ function layoutHome(input, vm) {
     }
     y += 78;
     const stack = [
-        { id: 'start', label: copy_1.COPY.start, primary: true, disabled: input.playsLeft <= 0 },
+        { id: 'start', label: copy_1.COPY.start, primary: true, disabled: !input.practiceStart && input.playsLeft <= 0 },
         { id: 'share', label: copy_1.COPY.shareHome, primary: false, disabled: false },
         { id: 'album', label: copy_1.COPY.album, primary: false, disabled: false },
     ];
+    if (input.practiceStart) {
+        stack.push({ id: 'resetDaily', label: copy_1.COPY.resetDaily, primary: false, disabled: false });
+    }
     if (input.adsOn)
         stack.push({ id: 'ad', label: copy_1.COPY.adButton, primary: false, disabled: false });
     for (let i = 0; i < stack.length; i += 1) {
@@ -196,7 +199,7 @@ function layoutResult(input, vm) {
     const bw = input.width - pad * 2;
     let y = input.safeTop + 258;
     const stack = [];
-    if (input.playsLeft > 0 && result) {
+    if (result && (input.playsLeft > 0 || input.practiceStart)) {
         stack.push({ id: 'again', label: (0, copy_1.againLabel)(result.graduated, copy_1.HEAT_NAME[result.nextHeatId]), primary: true });
     }
     if (input.canSave)

@@ -38,6 +38,7 @@ export interface WxSystemInfo {
 
 export interface WechatMiniGame {
   getSystemInfoSync(): WxSystemInfo;
+  getAccountInfoSync?(): { miniProgram?: { appId?: string } };
   createCanvas(): WxCanvas;
   createImage?(): WxImage;
   onTouchEnd(cb: (e: { changedTouches?: WxTouch[] }) => void): void;

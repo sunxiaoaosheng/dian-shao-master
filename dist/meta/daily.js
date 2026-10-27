@@ -1,12 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_AD_BONUS = exports.MAX_SHARE_BONUS = exports.FREE_PLAYS_PER_DAY = void 0;
+exports.MAX_AD_BONUS = exports.MAX_SHARE_BONUS = exports.TEST_APP_ID = exports.TEST_FREE_PLAYS_PER_DAY = exports.FREE_PLAYS_PER_DAY = void 0;
 exports.emptyDaily = emptyDaily;
 exports.formatDay = formatDay;
 exports.rollDaily = rollDaily;
 exports.shareSlotsLeft = shareSlotsLeft;
+exports.usesTestPotQuota = usesTestPotQuota;
+exports.freePlaysFor = freePlaysFor;
 exports.playsRemaining = playsRemaining;
 exports.canStart = canStart;
+exports.resetToday = resetToday;
 exports.consumePlay = consumePlay;
 exports.grantShareBonus = grantShareBonus;
 exports.grantAdBonus = grantAdBonus;
@@ -14,6 +17,10 @@ exports.parseDaily = parseDaily;
 exports.serializeDaily = serializeDaily;
 /** 每天免费开局次数。分享和广告都是额外加锅，不是开门条件。 */
 exports.FREE_PLAYS_PER_DAY = 3;
+/** 测试号阶段把免费锅放大，避免真机把当天次数用完后进不了局。 */
+exports.TEST_FREE_PLAYS_PER_DAY = 99;
+/** 当前用来真机验收的小游戏 AppID。正式号上线后再把日限收紧。 */
+exports.TEST_APP_ID = 'wx2ffe6f213fe9c05b';
 exports.MAX_SHARE_BONUS = 2;
 exports.MAX_AD_BONUS = 1;
 function emptyDaily(date) {
@@ -36,14 +43,34 @@ function shareSlotsLeft(state) {
     const left = exports.MAX_SHARE_BONUS - state.shareBonus;
     return left > 0 ? left : 0;
 }
-function playsRemaining(state) {
-    return exports.FREE_PLAYS_PER_DAY + state.shareBonus + state.adBonus - state.playsUsed;
+/** 开发者工具、测试 AppID，或还读不到 AppID 时，不让日限把验颠勺卡住。 */
+function usesTestPotQuota(appId, devtools) {
+    if (devtools)
+        return true;
+    if (appId === exports.TEST_APP_ID)
+        return true;
+    return appId.length === 0;
 }
-function canStart(state) {
-    return playsRemaining(state) > 0;
+function freePlaysFor(practice) {
+    return practice ? exports.TEST_FREE_PLAYS_PER_DAY : exports.FREE_PLAYS_PER_DAY;
 }
-function consumePlay(state) {
-    if (!canStart(state))
+function playsRemaining(state, freePlays = exports.FREE_PLAYS_PER_DAY) {
+    return freePlays + state.shareBonus + state.adBonus - state.playsUsed;
+}
+function canStart(state, freePlays = exports.FREE_PLAYS_PER_DAY) {
+    return playsRemaining(state, freePlays) > 0;
+}
+/** 只清今天已经用掉的锅，不改出师进度和菜册。 */
+function resetToday(state) {
+    return {
+        date: state.date,
+        playsUsed: 0,
+        shareBonus: state.shareBonus,
+        adBonus: state.adBonus,
+    };
+}
+function consumePlay(state, freePlays = exports.FREE_PLAYS_PER_DAY) {
+    if (!canStart(state, freePlays))
         return state;
     return {
         date: state.date,

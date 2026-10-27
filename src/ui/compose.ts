@@ -44,6 +44,9 @@ export interface ComposeInput {
   safeBottom: number;
   now: number;
   playsLeft: number;
+  /** 测试号或开发者工具：日限用完也能开炒，并显示重置锅数。 */
+  practiceStart: boolean;
+  playsHint: string;
   /** 今天还能靠自愿分享加的锅。用完且免费锅也没了，结算就指回灶台。 */
   shareLeft: number;
   /** 这一口还没写进出师次数。出师与否看本局合成、时间和招牌。 */
@@ -90,7 +93,7 @@ export function composeView(input: ComposeInput): ViewModel {
     title: COPY.title,
     subtitle: COPY.subtitle,
     playsLabel: playsLeftLabel(input.playsLeft),
-    playsHint: COPY.playsHint,
+    playsHint: input.playsHint,
     heatLabel: HEAT_NAME[input.heatId],
     goalText: input.goalText,
     feelText: tossFeelLine(input.tier),
@@ -147,10 +150,13 @@ function layoutHome(input: ComposeInput, vm: ViewModel): void {
   }
   y += 78;
   const stack = [
-    { id: 'start', label: COPY.start, primary: true, disabled: input.playsLeft <= 0 },
+    { id: 'start', label: COPY.start, primary: true, disabled: !input.practiceStart && input.playsLeft <= 0 },
     { id: 'share', label: COPY.shareHome, primary: false, disabled: false },
     { id: 'album', label: COPY.album, primary: false, disabled: false },
   ];
+  if (input.practiceStart) {
+    stack.push({ id: 'resetDaily', label: COPY.resetDaily, primary: false, disabled: false });
+  }
   if (input.adsOn) stack.push({ id: 'ad', label: COPY.adButton, primary: false, disabled: false });
   for (let i = 0; i < stack.length; i += 1) {
     const item = stack[i];
@@ -278,7 +284,7 @@ function layoutResult(input: ComposeInput, vm: ViewModel): void {
   const bw = input.width - pad * 2;
   let y = input.safeTop + 258;
   const stack: { id: string; label: string; primary: boolean }[] = [];
-  if (input.playsLeft > 0 && result) {
+  if (result && (input.playsLeft > 0 || input.practiceStart)) {
     stack.push({ id: 'again', label: againLabel(result.graduated, HEAT_NAME[result.nextHeatId]), primary: true });
   }
   if (input.canSave) stack.push({ id: 'save', label: COPY.saveClip, primary: false });

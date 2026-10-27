@@ -45,6 +45,7 @@ function createWechatPlatform() {
         safeTop,
         safeBottom,
         now: () => Date.now(),
+        appId: () => readAppId(wx),
         onPointer: (cb) => {
             pointer = cb;
         },
@@ -111,6 +112,16 @@ function createWechatPlatform() {
             }
         },
     };
+}
+function readAppId(wx) {
+    try {
+        const info = wx.getAccountInfoSync ? wx.getAccountInfoSync() : undefined;
+        const id = info && info.miniProgram ? info.miniProgram.appId : '';
+        return typeof id === 'string' ? id : '';
+    }
+    catch (_a) {
+        return '';
+    }
 }
 function getWx() {
     const host = globalThis;

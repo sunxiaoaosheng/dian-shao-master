@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TIER_NAME = exports.HEAT_NAME = exports.COPY = void 0;
 exports.playsLeftLabel = playsLeftLabel;
+exports.testPlaysHint = testPlaysHint;
 exports.heatStart = heatStart;
 exports.heatGoal = heatGoal;
 exports.nextPotLine = nextPotLine;
@@ -21,6 +22,7 @@ exports.cooldownLabel = cooldownLabel;
 exports.pickLine = pickLine;
 const gyro_1 = require("../input/gyro");
 const difficulty_1 = require("../meta/difficulty");
+const daily_1 = require("../meta/daily");
 /** 所有玩家能看见的句子都放这里，方便对着厨房口吻改，也方便测试挡住跑题的词。 */
 exports.COPY = {
     title: '颠勺王',
@@ -36,6 +38,9 @@ exports.COPY = {
     toss: '手动颠勺',
     noPlays: '今天的免费锅用完了',
     playsHint: '每天 3 锅免费。分享自愿，不分享也能明天再来。',
+    resetDaily: '重置今日锅数（测试）',
+    resetDailyOk: '今日锅数已清零（测试）',
+    probeStart: '这口用来验颠勺',
     hint: '点空位下锅。上下左右同级、还没糊的，并成下一味。斜着不算。',
     sensorLive: '握紧手机，向上颠一下',
     sensorFallback: '这台设备听不到晃动，用手动颠勺',
@@ -92,6 +97,9 @@ exports.TIER_NAME = {
 };
 function playsLeftLabel(n) {
     return `今天还能炒 ${n} 锅`;
+}
+function testPlaysHint() {
+    return `测试期每天 ${daily_1.TEST_FREE_PLAYS_PER_DAY} 锅。用完也能开炒，用来验颠勺。`;
 }
 function heatStart(name) {
     return `这锅是${name}`;

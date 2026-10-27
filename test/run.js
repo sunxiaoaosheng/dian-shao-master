@@ -27,7 +27,12 @@ const {
   rollDaily,
   parseDaily,
   shareSlotsLeft,
+  resetToday,
+  usesTestPotQuota,
+  freePlaysFor,
   FREE_PLAYS_PER_DAY,
+  TEST_FREE_PLAYS_PER_DAY,
+  TEST_APP_ID,
   MAX_SHARE_BONUS,
 } = require('../dist/meta/daily');
 const { emptyAlbum, grantCard } = require('../dist/meta/cards');
@@ -46,6 +51,7 @@ const {
   burnWarnLine,
   tossFeelLine,
   tossAck,
+  testPlaysHint,
 } = require('../dist/content/copy');
 const { SHARE_STICKER_ID } = require('../dist/viral/shareCard');
 const { ASSETS, LAYERS, MANIFEST_VERSION, assetById, foodIdForLevel } = require('../dist/content/manifest');
@@ -339,6 +345,14 @@ function testDaily() {
   assert.equal(canStart(state), false);
   const stuck = consumePlay(state);
   assert.equal(stuck.playsUsed, 3);
+  assert.equal(playsRemaining(state, TEST_FREE_PLAYS_PER_DAY), TEST_FREE_PLAYS_PER_DAY - 3);
+  assert.equal(canStart(state, TEST_FREE_PLAYS_PER_DAY), true);
+  assert.equal(freePlaysFor(true), TEST_FREE_PLAYS_PER_DAY);
+  assert.equal(freePlaysFor(false), FREE_PLAYS_PER_DAY);
+  assert.equal(usesTestPotQuota(TEST_APP_ID, false), true);
+  assert.equal(usesTestPotQuota('wx0000000000000000', false), false);
+  assert.equal(usesTestPotQuota('', false), true);
+  assert.equal(usesTestPotQuota('wx0000000000000000', true), true);
   const shared = grantShareBonus(state);
   assert.equal(shared.granted, true);
   assert.equal(canStart(shared.state), true);
@@ -353,6 +367,15 @@ function testDaily() {
   const next = rollDaily(ad.state, '2026-10-28');
   assert.equal(next.playsUsed, 0);
   assert.equal(playsRemaining(next), FREE_PLAYS_PER_DAY);
+  const wiped = resetToday(ad.state);
+  assert.equal(wiped.playsUsed, 0);
+  assert.equal(wiped.shareBonus, ad.state.shareBonus);
+  assert.equal(wiped.adBonus, ad.state.adBonus);
+  assert.equal(wiped.date, ad.state.date);
+  assert.equal(playsRemaining(wiped, TEST_FREE_PLAYS_PER_DAY), TEST_FREE_PLAYS_PER_DAY + wiped.shareBonus + wiped.adBonus);
+  assert.ok(COPY.resetDaily.includes('测试'));
+  assert.ok(COPY.probeStart.includes('颠勺'));
+  assert.ok(testPlaysHint().includes(String(TEST_FREE_PLAYS_PER_DAY)));
   assert.equal(parseDaily('{').date, '1970-01-01');
   assert.equal(ADS_ENABLED, false);
   assert.equal(REWARDED_AD_UNIT_ID, '');
@@ -380,6 +403,10 @@ function testDaily() {
   const start = appSrc.slice(appSrc.indexOf('private startRun'), appSrc.indexOf('private goHome'));
   assert.ok(!start.includes('share('), '开局不能拉起分享');
   assert.ok(!start.includes('shareAppMessage'));
+  assert.ok(start.indexOf('probeStart') < start.indexOf('noPlays'));
+  assert.ok(start.indexOf('noPlays') < start.indexOf('return'));
+  assert.ok(start.indexOf('return') < start.indexOf('beginSensors'), '没锅时测试号仍要进局再听传感器');
+  assert.ok(appSrc.includes('usesTestPotQuota'));
   const adapter = fs.readFileSync(path.join(__dirname, '../src/platform/wechat/adapter.ts'), 'utf8');
   assert.ok(!adapter.includes('grantShareBonus'));
 }
@@ -652,6 +679,8 @@ function testPaint() {
     safeBottom: 12,
     now: 5000,
     playsLeft: 2,
+    practiceStart: false,
+    playsHint: COPY.playsHint,
     shareLeft: 2,
     runsCompleted: 0,
     tier: 'standard',
@@ -758,6 +787,26 @@ function testPaint() {
   const home = composeView(Object.assign({}, base, { screen: 'home' }));
   assert.ok(home.feelText.includes('家常'));
   assert.ok(home.buttons.some((button) => button.id === 'start'));
+  assert.equal(home.playsHint, COPY.playsHint);
+  const locked = composeView(Object.assign({}, base, { screen: 'home', playsLeft: 0 }));
+  assert.equal(locked.buttons.find((button) => button.id === 'start').disabled, true);
+  assert.ok(!locked.buttons.some((button) => button.id === 'resetDaily'));
+  const practice = composeView(Object.assign({}, base, {
+    screen: 'home',
+    playsLeft: 0,
+    practiceStart: true,
+    playsHint: testPlaysHint(),
+  }));
+  assert.equal(practice.buttons.find((button) => button.id === 'start').disabled, false);
+  assert.ok(practice.buttons.some((button) => button.id === 'resetDaily' && button.label === COPY.resetDaily));
+  assert.ok(practice.playsHint.includes('99'));
+  const probeResult = composeView(Object.assign({}, base, {
+    screen: 'result',
+    playsLeft: 0,
+    shareLeft: 0,
+    practiceStart: true,
+  }));
+  assert.ok(probeResult.buttons.some((button) => button.id === 'again'));
 
   const shareOnly = composeView(Object.assign({}, base, { screen: 'result', playsLeft: 0, shareLeft: 1 }));
   assert.equal(shareOnly.result.nextLine, restartLine(0, true, '小火', 1));

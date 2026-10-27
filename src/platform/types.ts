@@ -15,6 +15,8 @@ export interface Platform {
   readonly safeTop: number;
   readonly safeBottom: number;
   now(): number;
+  /** 当前小游戏 AppID。读不到时返回空字符串。 */
+  appId(): string;
   onPointer(cb: (p: { x: number; y: number }) => void): void;
   storageGet(key: string): string | null;
   storageSet(key: string, value: string): void;

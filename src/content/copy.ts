@@ -1,5 +1,6 @@
 import { tossFeel, type SensitivityTier } from '../input/gyro';
 import { GRADUATION_MERGES, GRADUATION_MS, type HeatId } from '../meta/difficulty';
+import { TEST_FREE_PLAYS_PER_DAY } from '../meta/daily';
 import type { BurnWarnKind, GoalProgress } from '../meta/runGoal';
 
 /** 所有玩家能看见的句子都放这里，方便对着厨房口吻改，也方便测试挡住跑题的词。 */
@@ -17,6 +18,9 @@ export const COPY = {
   toss: '手动颠勺',
   noPlays: '今天的免费锅用完了',
   playsHint: '每天 3 锅免费。分享自愿，不分享也能明天再来。',
+  resetDaily: '重置今日锅数（测试）',
+  resetDailyOk: '今日锅数已清零（测试）',
+  probeStart: '这口用来验颠勺',
   hint: '点空位下锅。上下左右同级、还没糊的，并成下一味。斜着不算。',
   sensorLive: '握紧手机，向上颠一下',
   sensorFallback: '这台设备听不到晃动，用手动颠勺',
@@ -76,6 +80,10 @@ export const TIER_NAME: Record<SensitivityTier, string> = {
 
 export function playsLeftLabel(n: number): string {
   return `今天还能炒 ${n} 锅`;
+}
+
+export function testPlaysHint(): string {
+  return `测试期每天 ${TEST_FREE_PLAYS_PER_DAY} 锅。用完也能开炒，用来验颠勺。`;
 }
 
 export function heatStart(name: string): string {

@@ -1,4 +1,4 @@
-import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatGoal, heatStart, nextPotLine, tossAck } from './content/copy';
+import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatGoal, heatStart, nextPotLine, testPlaysHint, tossAck } from './content/copy';
 import { TOAST_LINES, pickToast } from './content/toasts';
 import { recipeForRun } from './content/recipes';
 import type { Recipe } from './content/recipes';
@@ -25,13 +25,16 @@ import {
   canStart,
   consumePlay,
   formatDay,
+  freePlaysFor,
   grantAdBonus,
   grantShareBonus,
   parseDaily,
   playsRemaining,
+  resetToday,
   rollDaily,
   serializeDaily,
   shareSlotsLeft,
+  usesTestPotQuota,
 } from './meta/daily';
 import type { DailyState } from './meta/daily';
 import { didGraduate, pickProfile } from './meta/difficulty';
@@ -103,9 +106,11 @@ class GameApp {
     nextHeatId: HeatId;
   } | null = null;
   private board: BoardEntry[] = [];
+  private readonly practice: boolean;
 
   constructor(platform: Platform) {
     this.platform = platform;
+    this.practice = usesTestPotQuota(platform.appId(), platform.isDevtools);
     const today = formatDay(platform.now());
     this.daily = rollDaily(parseDaily(platform.storageGet(KEY_DAILY)), today);
     this.album = parseAlbum(platform.storageGet(KEY_ALBUM));
@@ -165,7 +170,9 @@ class GameApp {
       safeTop: this.platform.safeTop,
       safeBottom: this.platform.safeBottom,
       now: this.platform.now(),
-      playsLeft: playsRemaining(this.daily),
+      playsLeft: playsRemaining(this.daily, this.potQuota()),
+      practiceStart: this.practice,
+      playsHint: this.practice ? testPlaysHint() : COPY.playsHint,
       shareLeft: shareSlotsLeft(this.daily),
       runsCompleted: this.meta.runsCompleted,
       tier: this.meta.tier,
@@ -213,6 +220,7 @@ class GameApp {
       return;
     }
     if (id === 'start' || id === 'again') this.startRun();
+    else if (id === 'resetDaily') this.resetTodayPots();
     else if (id === 'album') this.screen = 'album';
     else if (id === 'home') this.goHome();
     else if (id === 'toss') this.tryToss('button');
@@ -222,14 +230,29 @@ class GameApp {
     else if (id === 'save') void this.saveClip();
   }
 
+  private potQuota(): number {
+    return freePlaysFor(this.practice);
+  }
+
+  private resetTodayPots(): void {
+    this.refreshDate();
+    this.daily = resetToday(this.daily);
+    this.saveDaily();
+    this.toast(COPY.resetDailyOk);
+  }
+
   private startRun(): void {
     this.refreshDate();
-    if (!canStart(this.daily)) {
+    const quota = this.potQuota();
+    if (canStart(this.daily, quota)) {
+      this.daily = consumePlay(this.daily, quota);
+      this.saveDaily();
+    } else if (this.practice) {
+      this.toast(COPY.probeStart);
+    } else {
       this.toast(COPY.noPlays);
       return;
     }
-    this.daily = consumePlay(this.daily);
-    this.saveDaily();
     const profile = pickProfile(this.meta.runsCompleted);
     this.recipe = recipeForRun(this.meta.runsCompleted);
     this.session = createSession({

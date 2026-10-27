@@ -1,5 +1,9 @@
 /** 每天免费开局次数。分享和广告都是额外加锅，不是开门条件。 */
 export const FREE_PLAYS_PER_DAY = 3;
+/** 测试号阶段把免费锅放大，避免真机把当天次数用完后进不了局。 */
+export const TEST_FREE_PLAYS_PER_DAY = 99;
+/** 当前用来真机验收的小游戏 AppID。正式号上线后再把日限收紧。 */
+export const TEST_APP_ID = 'wx2ffe6f213fe9c05b';
 export const MAX_SHARE_BONUS = 2;
 export const MAX_AD_BONUS = 1;
 
@@ -33,16 +37,37 @@ export function shareSlotsLeft(state: DailyState): number {
   return left > 0 ? left : 0;
 }
 
-export function playsRemaining(state: DailyState): number {
-  return FREE_PLAYS_PER_DAY + state.shareBonus + state.adBonus - state.playsUsed;
+/** 开发者工具、测试 AppID，或还读不到 AppID 时，不让日限把验颠勺卡住。 */
+export function usesTestPotQuota(appId: string, devtools: boolean): boolean {
+  if (devtools) return true;
+  if (appId === TEST_APP_ID) return true;
+  return appId.length === 0;
 }
 
-export function canStart(state: DailyState): boolean {
-  return playsRemaining(state) > 0;
+export function freePlaysFor(practice: boolean): number {
+  return practice ? TEST_FREE_PLAYS_PER_DAY : FREE_PLAYS_PER_DAY;
 }
 
-export function consumePlay(state: DailyState): DailyState {
-  if (!canStart(state)) return state;
+export function playsRemaining(state: DailyState, freePlays = FREE_PLAYS_PER_DAY): number {
+  return freePlays + state.shareBonus + state.adBonus - state.playsUsed;
+}
+
+export function canStart(state: DailyState, freePlays = FREE_PLAYS_PER_DAY): boolean {
+  return playsRemaining(state, freePlays) > 0;
+}
+
+/** 只清今天已经用掉的锅，不改出师进度和菜册。 */
+export function resetToday(state: DailyState): DailyState {
+  return {
+    date: state.date,
+    playsUsed: 0,
+    shareBonus: state.shareBonus,
+    adBonus: state.adBonus,
+  };
+}
+
+export function consumePlay(state: DailyState, freePlays = FREE_PLAYS_PER_DAY): DailyState {
+  if (!canStart(state, freePlays)) return state;
   return {
     date: state.date,
     playsUsed: state.playsUsed + 1,

@@ -57,6 +57,7 @@ class GameApp {
         this.result = null;
         this.board = [];
         this.platform = platform;
+        this.practice = (0, daily_1.usesTestPotQuota)(platform.appId(), platform.isDevtools);
         const today = (0, daily_1.formatDay)(platform.now());
         this.daily = (0, daily_1.rollDaily)((0, daily_1.parseDaily)(platform.storageGet(keys_1.KEY_DAILY)), today);
         this.album = (0, cards_1.parseAlbum)(platform.storageGet(keys_1.KEY_ALBUM));
@@ -118,7 +119,9 @@ class GameApp {
             safeTop: this.platform.safeTop,
             safeBottom: this.platform.safeBottom,
             now: this.platform.now(),
-            playsLeft: (0, daily_1.playsRemaining)(this.daily),
+            playsLeft: (0, daily_1.playsRemaining)(this.daily, this.potQuota()),
+            practiceStart: this.practice,
+            playsHint: this.practice ? (0, copy_1.testPlaysHint)() : copy_1.COPY.playsHint,
             shareLeft: (0, daily_1.shareSlotsLeft)(this.daily),
             runsCompleted: this.meta.runsCompleted,
             tier: this.meta.tier,
@@ -168,6 +171,8 @@ class GameApp {
         }
         if (id === 'start' || id === 'again')
             this.startRun();
+        else if (id === 'resetDaily')
+            this.resetTodayPots();
         else if (id === 'album')
             this.screen = 'album';
         else if (id === 'home')
@@ -183,14 +188,29 @@ class GameApp {
         else if (id === 'save')
             void this.saveClip();
     }
+    potQuota() {
+        return (0, daily_1.freePlaysFor)(this.practice);
+    }
+    resetTodayPots() {
+        this.refreshDate();
+        this.daily = (0, daily_1.resetToday)(this.daily);
+        this.saveDaily();
+        this.toast(copy_1.COPY.resetDailyOk);
+    }
     startRun() {
         this.refreshDate();
-        if (!(0, daily_1.canStart)(this.daily)) {
+        const quota = this.potQuota();
+        if ((0, daily_1.canStart)(this.daily, quota)) {
+            this.daily = (0, daily_1.consumePlay)(this.daily, quota);
+            this.saveDaily();
+        }
+        else if (this.practice) {
+            this.toast(copy_1.COPY.probeStart);
+        }
+        else {
             this.toast(copy_1.COPY.noPlays);
             return;
         }
-        this.daily = (0, daily_1.consumePlay)(this.daily);
-        this.saveDaily();
         const profile = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
         this.recipe = (0, recipes_1.recipeForRun)(this.meta.runsCompleted);
         this.session = (0, session_1.createSession)({
