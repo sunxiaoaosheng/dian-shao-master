@@ -1,0 +1,101 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createMotionBridge = createMotionBridge;
+/**
+ * 只负责 wx.startDeviceMotionListening / onDeviceMotionChange
+ * 和加速度计。采样交给 src/input/gyro.ts，这里不判断颠勺。
+ */
+function createMotionBridge(wx) {
+    let motionToken = 0;
+    let accelToken = 0;
+    let motionHandler = null;
+    let accelHandler = null;
+    const sink = {};
+    function stop() {
+        motionToken += 1;
+        accelToken += 1;
+        if (motionHandler && wx.offDeviceMotionChange)
+            wx.offDeviceMotionChange(motionHandler);
+        if (accelHandler && wx.offAccelerometerChange)
+            wx.offAccelerometerChange(accelHandler);
+        motionHandler = null;
+        accelHandler = null;
+        if (wx.stopDeviceMotionListening)
+            wx.stopDeviceMotionListening({});
+        if (wx.stopAccelerometer)
+            wx.stopAccelerometer({});
+    }
+    function startMotion() {
+        if (!wx.startDeviceMotionListening || !wx.onDeviceMotionChange)
+            return Promise.resolve('unsupported');
+        const token = ++motionToken;
+        return new Promise((resolve) => {
+            var _a;
+            (_a = wx.startDeviceMotionListening) === null || _a === void 0 ? void 0 : _a.call(wx, {
+                interval: 'game',
+                success: () => {
+                    var _a;
+                    if (token !== motionToken) {
+                        resolve('denied');
+                        return;
+                    }
+                    if (motionHandler && wx.offDeviceMotionChange)
+                        wx.offDeviceMotionChange(motionHandler);
+                    motionHandler = (res) => {
+                        var _a;
+                        if (token !== motionToken)
+                            return;
+                        (_a = sink.motion) === null || _a === void 0 ? void 0 : _a.call(sink, {
+                            alpha: res.alpha || 0,
+                            beta: res.beta || 0,
+                            gamma: res.gamma || 0,
+                        });
+                    };
+                    (_a = wx.onDeviceMotionChange) === null || _a === void 0 ? void 0 : _a.call(wx, motionHandler);
+                    resolve('ok');
+                },
+                fail: (err) => {
+                    console.warn('[颠勺] 动作传感器不可用', err && err.errMsg);
+                    resolve('denied');
+                },
+            });
+        });
+    }
+    function startAccel() {
+        if (!wx.startAccelerometer || !wx.onAccelerometerChange)
+            return Promise.resolve('unsupported');
+        const token = ++accelToken;
+        return new Promise((resolve) => {
+            var _a;
+            (_a = wx.startAccelerometer) === null || _a === void 0 ? void 0 : _a.call(wx, {
+                interval: 'game',
+                success: () => {
+                    var _a;
+                    if (token !== accelToken) {
+                        resolve('denied');
+                        return;
+                    }
+                    if (accelHandler && wx.offAccelerometerChange)
+                        wx.offAccelerometerChange(accelHandler);
+                    accelHandler = (res) => {
+                        var _a;
+                        if (token !== accelToken)
+                            return;
+                        (_a = sink.accel) === null || _a === void 0 ? void 0 : _a.call(sink, {
+                            x: res.x || 0,
+                            y: res.y || 0,
+                            z: res.z || 0,
+                        });
+                    };
+                    (_a = wx.onAccelerometerChange) === null || _a === void 0 ? void 0 : _a.call(wx, accelHandler);
+                    resolve('ok');
+                },
+                fail: (err) => {
+                    console.warn('[颠勺] 加速度计不可用', err && err.errMsg);
+                    resolve('denied');
+                },
+            });
+        });
+    }
+    return { sink, startMotion, startAccel, stop };
+}
