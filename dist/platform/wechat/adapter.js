@@ -64,6 +64,7 @@ function createWechatPlatform() {
                 wx.vibrateShort({ type: 'medium' });
         },
         createOffscreen: (w, h) => makeOffscreen(wx, w, h),
+        createImage: () => (wx.createImage ? wx.createImage() : null),
         saveImage: (path) => saveToAlbum(wx, path),
         onShow: (cb) => {
             onShow = cb;

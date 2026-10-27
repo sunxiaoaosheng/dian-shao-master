@@ -1,4 +1,5 @@
-import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatStart, pickLine } from './content/copy';
+import { COPY, HEAT_NAME, TIER_NAME, cardToast, heatStart } from './content/copy';
+import { TOAST_LINES, pickToast } from './content/toasts';
 import { recipeForRun } from './content/recipes';
 import type { Recipe } from './content/recipes';
 import type { GameEvent } from './core/types';
@@ -40,6 +41,7 @@ import type { Platform } from './platform/types';
 import { composeView } from './ui/compose';
 import type { ToastState } from './ui/compose';
 import { paint } from './ui/paint';
+import { loadCollage } from './ui/sprites';
 import type { ScreenId, ViewModel } from './ui/types';
 import { CLIP_H, CLIP_W, paintClip } from './viral/clip';
 import { momentLine } from './viral/moment';
@@ -114,6 +116,7 @@ class GameApp {
       this.feed(this.mux.accel(res, this.platform.now()));
     });
     platform.setMenuShare({ title: COPY.menuShare, query: 'from=menu' });
+    loadCollage(() => platform.createImage());
   }
 
   tick(dt: number): void {
@@ -250,7 +253,7 @@ class GameApp {
     this.tossReadyAt = nextReadyAt(now, this.meta.tier);
     this.shake = 1;
     this.platform.vibrate();
-    this.toast(pickLine(COPY.tossLines, now));
+    this.toast(pickToast(now).text);
     this.captureMoment(source === 'gyro' ? 1 : 0.65);
     this.consumeEvents(result.events);
   }
@@ -403,7 +406,7 @@ class GameApp {
       else if (event.type === 'burnt_piece') burnt = true;
       else if (event.type === 'fail') this.finishRun(event.reason);
     }
-    if (merged) this.toast(pickLine(COPY.mergeLines, this.platform.now()));
+    if (merged) this.toast(pickToast(this.platform.now() + 3).text);
     if (burnt) this.toast(COPY.burntPiece);
   }
 
@@ -436,6 +439,7 @@ class GameApp {
       cardName: session.cardsThisRun > 0 && this.recipe ? this.recipe.name : null,
     };
     this.screen = 'result';
+    if (reason === 'burnt_out') this.toast(TOAST_LINES[6].text);
     this.sensorGen += 1;
     this.platform.stopSensors();
   }

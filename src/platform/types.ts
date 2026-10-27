@@ -1,4 +1,5 @@
 import type { Ctx } from '../ui/ctx';
+import type { CollageImage } from '../ui/sprites';
 
 export interface Offscreen {
   ctx: Ctx;
@@ -25,6 +26,8 @@ export interface Platform {
   share(payload: { title: string; imageUrl?: string; query?: string }): Promise<'ok' | 'fail'>;
   vibrate(): void;
   createOffscreen(w: number, h: number): Offscreen | null;
+  /** 用来加载 assets/ 下的剪贴 PNG。没有这个接口时游戏继续用矢量。 */
+  createImage(): CollageImage | null;
   saveImage(path: string): Promise<'ok' | 'fail'>;
   onShow(cb: () => void): void;
   onHide(cb: () => void): void;

@@ -34,4 +34,6 @@ export interface Ctx {
   clip(): void;
   setLineDash(segments: number[]): void;
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): CtxGradient;
+  /** 剪贴 PNG。占位图没加载完时调用方会改画矢量。 */
+  drawImage?(image: unknown, dx: number, dy: number, dw: number, dh: number): void;
 }

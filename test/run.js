@@ -23,6 +23,9 @@ const { emptyAlbum, grantCard } = require('../dist/meta/cards');
 const { createReservedRewardedAd, REWARDED_AD_UNIT_ID } = require('../dist/meta/ads');
 const { getRegionalBoard } = require('../dist/meta/leaderboard');
 const { COPY } = require('../dist/content/copy');
+const { ALL_FRAMES } = require('../dist/content/collage');
+const { TOAST_LINES, toastImageFor } = require('../dist/content/toasts');
+const { loadCollage, resetCollageForTests, spriteReady } = require('../dist/ui/sprites');
 const { RECIPES, recipeForRun } = require('../dist/content/recipes');
 const {
   createTossDetector,
@@ -367,6 +370,79 @@ function testGyro() {
   assert.equal(accelResult.fires, 1, `只有加速度计也应认出猛颠 impulse ${accelResult.maxI}`);
 }
 
+function pngInfo(buf) {
+  assert.equal(buf[0], 137, 'PNG 签名');
+  assert.equal(buf.toString('ascii', 1, 4), 'PNG');
+  assert.equal(buf.toString('ascii', 12, 16), 'IHDR');
+  assert.equal(buf[24], 8, '位深');
+  assert.equal(buf[25], 6, 'RGBA');
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
+
+function testCollage() {
+  const lines = [
+    '火候？我跟火候不熟。',
+    '颠勺不是甩锅，别误会。',
+    '油花比我命还欢。',
+    '这菜：差点完美，完美差点。',
+    '锅在飞，心在颤。',
+    '盐放多了就叫「个性」。',
+    '糊了也是烟火气。',
+    '再颠一下，信我。',
+  ];
+  assert.equal(TOAST_LINES.length, 8);
+  for (let i = 0; i < lines.length; i += 1) {
+    assert.equal(TOAST_LINES[i].text, lines[i]);
+    assert.equal(TOAST_LINES[i].image.path, `assets/type/type-toast-0${i + 1}.png`);
+    assert.ok(TOAST_LINES[i].image.pxW <= 280);
+  }
+  assert.equal(toastImageFor(lines[6]).path, 'assets/type/type-toast-07.png');
+  assert.equal(toastImageFor('糊了'), null);
+  const perfect = ALL_FRAMES.find((frame) => frame.path.endsWith('type-perfect.png'));
+  const burnt = ALL_FRAMES.find((frame) => frame.path.endsWith('type-burnt.png'));
+  assert.ok(perfect.pxW <= 160 && burnt.pxW <= 160);
+
+  const seen = new Set();
+  for (const frame of ALL_FRAMES) {
+    assert.ok(!seen.has(frame.path), frame.path);
+    seen.add(frame.path);
+    assert.match(frame.path, /^assets\/(ui|food|fx|type)\/(ui|food|fx|type)-[a-z0-9-]+\.png$/);
+    const folder = frame.path.split('/')[1];
+    const prefix = path.basename(frame.path).split('-')[0];
+    assert.equal(prefix, folder, frame.path);
+    const info = pngInfo(fs.readFileSync(path.join(__dirname, '..', frame.path)));
+    assert.equal(info.w, frame.pxW, frame.path);
+    assert.equal(info.h, frame.pxH, frame.path);
+    assert.ok(frame.pxW <= 1024 && frame.pxH <= 1334, frame.path);
+  }
+
+  resetCollageForTests();
+  const srcs = [];
+  loadCollage(() => {
+    let src = '';
+    let onload = null;
+    return {
+      width: 4,
+      height: 4,
+      onerror: null,
+      get onload() { return onload; },
+      set onload(fn) { onload = fn; },
+      get src() { return src; },
+      set src(value) {
+        src = value;
+        srcs.push(value);
+        if (onload) onload();
+      },
+    };
+  });
+  assert.equal(srcs.length, ALL_FRAMES.length);
+  for (let i = 0; i < ALL_FRAMES.length; i += 1) {
+    assert.equal(srcs[i], ALL_FRAMES[i].path);
+    assert.equal(spriteReady(ALL_FRAMES[i]), true);
+  }
+  resetCollageForTests();
+}
+
 function testWords() {
   const banned = /工位|周报|KPI|OKR|打卡|同事|老板|会议|PPT|职场|格子间|加班|最后一格|需求文档|排期|考勤/;
   const root = path.join(__dirname, '../src');
@@ -475,6 +551,22 @@ function testBoot() {
     onHide() {},
     getLaunchOptionsSync() { return { query: {} }; },
     saveImageToPhotosAlbum(opts) { if (opts && opts.success) opts.success(); },
+    createImage() {
+      let src = '';
+      let onload = null;
+      return {
+        width: 4,
+        height: 4,
+        onerror: null,
+        get onload() { return onload; },
+        set onload(fn) { onload = fn; },
+        get src() { return src; },
+        set src(value) {
+          src = value;
+          if (onload) onload();
+        },
+      };
+    },
   };
   require('../dist/main.js');
 }
@@ -483,6 +575,7 @@ testMerge();
 testSession();
 testDaily();
 testGyro();
+testCollage();
 testWords();
 testPaint();
 testBoot();

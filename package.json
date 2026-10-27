@@ -5,6 +5,7 @@
   "description": "颠勺大师 — 微信小游戏",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "assets": "npm run build && node tools/gen-collage-placeholders.mjs",
     "test": "npm run build && node test/run.js",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
   },

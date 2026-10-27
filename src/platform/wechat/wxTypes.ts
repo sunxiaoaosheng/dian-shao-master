@@ -20,6 +20,14 @@ export interface WxCanvas {
   }): void;
 }
 
+export interface WxImage {
+  src: string;
+  width: number;
+  height: number;
+  onload: null | (() => void);
+  onerror: null | (() => void);
+}
+
 export interface WxSystemInfo {
   windowWidth: number;
   windowHeight: number;
@@ -31,6 +39,7 @@ export interface WxSystemInfo {
 export interface WechatMiniGame {
   getSystemInfoSync(): WxSystemInfo;
   createCanvas(): WxCanvas;
+  createImage?(): WxImage;
   onTouchEnd(cb: (e: { changedTouches?: WxTouch[] }) => void): void;
   getStorageSync(key: string): unknown;
   setStorageSync(key: string, value: string): void;

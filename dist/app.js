@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startGame = startGame;
 const copy_1 = require("./content/copy");
+const toasts_1 = require("./content/toasts");
 const recipes_1 = require("./content/recipes");
 const session_1 = require("./core/session");
 const gyro_1 = require("./input/gyro");
@@ -18,6 +19,7 @@ const progress_1 = require("./meta/progress");
 const share_1 = require("./meta/share");
 const compose_1 = require("./ui/compose");
 const paint_1 = require("./ui/paint");
+const sprites_1 = require("./ui/sprites");
 const clip_1 = require("./viral/clip");
 const moment_1 = require("./viral/moment");
 const shareCard_1 = require("./viral/shareCard");
@@ -83,6 +85,7 @@ class GameApp {
             this.feed(this.mux.accel(res, this.platform.now()));
         });
         platform.setMenuShare({ title: copy_1.COPY.menuShare, query: 'from=menu' });
+        (0, sprites_1.loadCollage)(() => platform.createImage());
     }
     tick(dt) {
         this.refreshDate();
@@ -225,7 +228,7 @@ class GameApp {
         this.tossReadyAt = (0, gyro_1.nextReadyAt)(now, this.meta.tier);
         this.shake = 1;
         this.platform.vibrate();
-        this.toast((0, copy_1.pickLine)(copy_1.COPY.tossLines, now));
+        this.toast((0, toasts_1.pickToast)(now).text);
         this.captureMoment(source === 'gyro' ? 1 : 0.65);
         this.consumeEvents(result.events);
     }
@@ -386,7 +389,7 @@ class GameApp {
                 this.finishRun(event.reason);
         }
         if (merged)
-            this.toast((0, copy_1.pickLine)(copy_1.COPY.mergeLines, this.platform.now()));
+            this.toast((0, toasts_1.pickToast)(this.platform.now() + 3).text);
         if (burnt)
             this.toast(copy_1.COPY.burntPiece);
     }
@@ -421,6 +424,8 @@ class GameApp {
             cardName: session.cardsThisRun > 0 && this.recipe ? this.recipe.name : null,
         };
         this.screen = 'result';
+        if (reason === 'burnt_out')
+            this.toast(toasts_1.TOAST_LINES[6].text);
         this.sensorGen += 1;
         this.platform.stopSensors();
     }

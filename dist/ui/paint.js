@@ -1,8 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.paint = paint;
+const collage_1 = require("../content/collage");
 const copy_1 = require("../content/copy");
+const toasts_1 = require("../content/toasts");
 const draw_1 = require("./draw");
+const sprites_1 = require("./sprites");
 const theme_1 = require("./theme");
 function paint(ctx, vm) {
     ctx.save();
@@ -10,7 +13,8 @@ function paint(ctx, vm) {
         const mag = vm.shake * 8;
         ctx.translate(Math.sin(vm.now / 28) * mag, Math.cos(vm.now / 22) * mag * 0.65);
     }
-    (0, draw_1.paintPaper)(ctx, vm.width, vm.height);
+    if (!(0, sprites_1.drawSprite)(ctx, collage_1.UI.paperBg, 0, 0, vm.width, vm.height))
+        (0, draw_1.paintPaper)(ctx, vm.width, vm.height);
     if (vm.screen === 'home')
         paintHome(ctx, vm);
     else if (vm.screen === 'play')
@@ -30,7 +34,9 @@ function paintHome(ctx, vm) {
     const cardH = 118;
     ctx.save();
     ctx.translate(16, cardY);
-    (0, draw_1.fillTorn)(ctx, cardW, cardH, 11, theme_1.PALETTE.white, 0.04);
+    if (!(0, sprites_1.drawSprite)(ctx, collage_1.UI.panelTorn, 0, 0, cardW, cardH))
+        (0, draw_1.fillTorn)(ctx, cardW, cardH, 11, theme_1.PALETTE.white, 0.04);
+    (0, sprites_1.drawSprite)(ctx, collage_1.UI.tapeStrip, 18, -8, 78, 22);
     ctx.fillStyle = theme_1.PALETTE.ink;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -86,20 +92,36 @@ function paintPlay(ctx, vm) {
     ctx.font = (0, theme_1.font)(13, false);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
     ctx.fillText(`${play.region} · ${vm.heatLabel}`, 16, 40);
-    ctx.fillStyle = theme_1.PALETTE.ink;
     ctx.textAlign = 'right';
     ctx.font = (0, theme_1.font)(16, true);
-    ctx.fillText(play.scoreText, vm.width - 16, 16);
+    if ((0, sprites_1.drawSprite)(ctx, collage_1.UI.scoreChip, vm.width - 104, 8, 88, 30)) {
+        ctx.fillStyle = theme_1.PALETTE.ink;
+        ctx.fillText(play.scoreText, vm.width - 60, 14);
+    }
+    else {
+        ctx.fillStyle = theme_1.PALETTE.ink;
+        ctx.fillText(play.scoreText, vm.width - 16, 16);
+    }
     ctx.font = (0, theme_1.font)(12, false);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
-    ctx.fillText(play.chargesText, vm.width - 16, 38);
-    (0, draw_1.drawMeter)(ctx, 16, 64, vm.width - 32, 12, play.meter);
+    ctx.fillText(play.chargesText, vm.width - 16, 40);
+    paintHearts(ctx, vm.width - 16, 56, play.charges, play.maxCharges);
+    if (!paintMeter(ctx, 16, 64, vm.width - 32, 12, play.meter)) {
+        (0, draw_1.drawMeter)(ctx, 16, 64, vm.width - 32, 12, play.meter);
+    }
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
     ctx.textAlign = 'left';
     ctx.font = (0, theme_1.font)(11, true);
     ctx.fillText(copy_1.COPY.meter, 16, 50);
-    (0, draw_1.drawWok)(ctx, play.wok.x, play.wok.y, play.wok.w, play.wok.h);
+    if (!(0, sprites_1.drawSprite)(ctx, collage_1.FOOD.wokBase, play.wok.x, play.wok.y + play.wok.h * 0.35, play.wok.w, play.wok.h * 0.55)) {
+        (0, draw_1.drawWok)(ctx, play.wok.x, play.wok.y, play.wok.w, play.wok.h);
+    }
+    (0, sprites_1.drawSprite)(ctx, collage_1.FOOD.oilSheen, play.wok.x + play.wok.w * 0.18, play.wok.y + play.wok.h * 0.42, play.wok.w * 0.64, play.wok.h * 0.28);
+    (0, sprites_1.drawSprite)(ctx, collage_1.FOOD.wokHandle, play.wok.x - 18, play.wok.y + play.wok.h * 0.2, 28, 72);
     (0, draw_1.drawSteam)(ctx, play.wok.x + play.wok.w / 2, play.wok.y + 6, vm.now);
+    if (play.meter > 0.72) {
+        (0, sprites_1.drawSprite)(ctx, collage_1.FX.flameLick, vm.width - 48, 48, 28, 42);
+    }
     for (let i = 0; i < play.cells.length; i += 1) {
         const cell = play.cells[i];
         if (cell.level <= 0) {
@@ -112,7 +134,23 @@ function paintPlay(ctx, vm) {
             ctx.restore();
             continue;
         }
-        (0, draw_1.drawPolaroid)(ctx, cell.x, cell.y, cell.w, cell.h, cell.seed, cell.level, cell.ink, cell.name, cell.burnt, cell.cook);
+        const food = (0, collage_1.foodForLevel)(cell.level, cell.seed);
+        if (!(0, sprites_1.drawSprite)(ctx, food, cell.x + 4, cell.y + 4, cell.w - 8, cell.h - 22)) {
+            (0, draw_1.drawPolaroid)(ctx, cell.x, cell.y, cell.w, cell.h, cell.seed, cell.level, cell.ink, cell.name, cell.burnt, cell.cook);
+        }
+        else {
+            ctx.fillStyle = theme_1.PALETTE.ink;
+            ctx.font = (0, theme_1.font)(11, true);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(cell.name, cell.x + cell.w / 2, cell.y + cell.h - 1);
+            if (cell.level >= 2)
+                (0, sprites_1.drawSprite)(ctx, collage_1.FOOD.scallion, cell.x + cell.w - 18, cell.y + 2, 16, 10);
+            if (cell.burnt) {
+                (0, sprites_1.drawSprite)(ctx, collage_1.FX.smokePuff, cell.x, cell.y, cell.w, cell.h * 0.7);
+                (0, sprites_1.drawSprite)(ctx, collage_1.FX.missDrip, cell.x + cell.w * 0.35, cell.y + cell.h * 0.4, 14, 22);
+            }
+        }
     }
     (0, draw_1.drawPolaroid)(ctx, play.nextBox.x, play.nextBox.y, play.nextBox.w, play.nextBox.h, 9, play.nextLevel, play.nextInk, play.nextName, false, 0);
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
@@ -130,12 +168,25 @@ function paintPlay(ctx, vm) {
     ctx.fillStyle = theme_1.PALETTE.inkSoft;
     ctx.fillText(play.tossedText, noteX, play.nextBox.y + 36);
     if (vm.shake > 0.2) {
+        const scraps = [collage_1.FX.scrap01, collage_1.FX.scrap02, collage_1.FX.scrap03];
+        const stars = [collage_1.FX.star01, collage_1.FX.star02, collage_1.FX.star03, collage_1.FX.star04];
+        const cx = play.wok.x + play.wok.w / 2;
+        const cy = play.wok.y + play.wok.h * 0.35;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.35, vm.shake);
+        for (let i = 0; i < scraps.length; i += 1) {
+            (0, sprites_1.drawSprite)(ctx, scraps[i], cx - 70 + i * 36, cy - 28 - i * 10, 22, 22);
+        }
+        for (let i = 0; i < stars.length; i += 1) {
+            (0, sprites_1.drawSprite)(ctx, stars[i], cx - 40 + (i % 2) * 48, cy - 10 - i * 8, 16, 16);
+        }
+        if (vm.shake > 0.65)
+            (0, sprites_1.drawSprite)(ctx, collage_1.FX.perfectBurst, cx - 48, cy - 48, 96, 96);
+        ctx.restore();
         ctx.save();
         ctx.globalAlpha = vm.shake * 0.8;
         ctx.strokeStyle = theme_1.PALETTE.white;
         ctx.lineWidth = 2;
-        const cx = play.wok.x + play.wok.w / 2;
-        const cy = play.wok.y + play.wok.h * 0.4;
         for (let i = 0; i < 4; i += 1) {
             ctx.beginPath();
             ctx.moveTo(cx - 30 - i * 8, cy);
@@ -145,6 +196,12 @@ function paintPlay(ctx, vm) {
             ctx.stroke();
         }
         ctx.restore();
+    }
+    if (play.showPerfect) {
+        (0, sprites_1.drawSprite)(ctx, collage_1.TYPE.perfect, play.wok.x + play.wok.w - 54, play.wok.y, 48, 28);
+    }
+    if (play.showBurnt) {
+        (0, sprites_1.drawSprite)(ctx, collage_1.TYPE.burnt, play.wok.x + 8, play.wok.y, 48, 28);
     }
     paintButtons(ctx, vm);
 }
@@ -201,7 +258,29 @@ function paintAlbum(ctx, vm) {
 function paintButtons(ctx, vm) {
     for (let i = 0; i < vm.buttons.length; i += 1) {
         const button = vm.buttons[i];
-        (0, draw_1.drawButton)(ctx, button.x, button.y, button.w, button.h, button.label, button.primary, button.disabled, button.selected);
+        const plate = button.primary ? collage_1.UI.btnPrimary : collage_1.UI.btnGhost;
+        if (!(0, sprites_1.drawSprite)(ctx, plate, button.x, button.y, button.w, button.h)) {
+            (0, draw_1.drawButton)(ctx, button.x, button.y, button.w, button.h, button.label, button.primary, button.disabled, button.selected);
+            continue;
+        }
+        ctx.save();
+        ctx.globalAlpha = button.disabled ? 0.45 : 1;
+        ctx.fillStyle = button.primary ? theme_1.PALETTE.white : theme_1.PALETTE.ink;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        let size = button.h >= 46 ? 18 : 15;
+        ctx.font = (0, theme_1.font)(size, true);
+        while (size > 11 && ctx.measureText(button.label).width > button.w - 18) {
+            size -= 1;
+            ctx.font = (0, theme_1.font)(size, true);
+        }
+        ctx.fillText(button.label, button.x + button.w / 2, button.y + button.h / 2 + 1);
+        if (button.selected) {
+            ctx.strokeStyle = theme_1.PALETTE.chiliDeep;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(button.x + 2, button.y + 2, button.w - 4, button.h - 4);
+        }
+        ctx.restore();
     }
 }
 function paintToasts(ctx, vm) {
@@ -214,13 +293,37 @@ function paintToasts(ctx, vm) {
         ctx.translate(x, y);
         ctx.rotate(-0.03);
         ctx.globalAlpha = Math.max(0.2, toast.life);
-        (0, draw_1.fillTorn)(ctx, w, 34, toast.seed || 3, '#fffaf1', 0.06);
+        const plate = (0, toasts_1.toastImageFor)(toast.text);
+        if (!plate || !(0, sprites_1.drawSprite)(ctx, plate, 0, 0, w, 34))
+            (0, draw_1.fillTorn)(ctx, w, 34, toast.seed || 3, '#fffaf1', 0.06);
         ctx.fillStyle = theme_1.PALETTE.ink;
         ctx.font = (0, theme_1.font)(15, true);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(toast.text, w / 2, 18);
         ctx.restore();
+    }
+}
+function paintMeter(ctx, x, y, w, h, ratio) {
+    if (!(0, sprites_1.drawSprite)(ctx, collage_1.UI.progressTrack, x, y, w, h))
+        return false;
+    const clamped = ratio < 0 ? 0 : ratio > 1 ? 1 : ratio;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, Math.max(0, w * clamped), h);
+    ctx.clip();
+    (0, sprites_1.drawSprite)(ctx, collage_1.UI.progressFill, x, y, w, h);
+    ctx.restore();
+    return true;
+}
+function paintHearts(ctx, right, y, charges, maxCharges) {
+    const size = 14;
+    const gap = 2;
+    const count = Math.max(0, Math.min(6, maxCharges));
+    for (let i = 0; i < count; i += 1) {
+        const frame = i < charges ? collage_1.UI.heart : collage_1.UI.heartEmpty;
+        const x = right - (count - i) * (size + gap);
+        (0, sprites_1.drawSprite)(ctx, frame, x, y, size, size);
     }
 }
 function paintQa(ctx, vm) {

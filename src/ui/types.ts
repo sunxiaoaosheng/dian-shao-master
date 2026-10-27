@@ -34,7 +34,11 @@ export interface PlayVM {
   scoreText: string;
   meter: number;
   chargesText: string;
+  charges: number;
+  maxCharges: number;
   tossedText: string;
+  showPerfect: boolean;
+  showBurnt: boolean;
   cells: CellVM[];
   nextName: string;
   nextLevel: number;
