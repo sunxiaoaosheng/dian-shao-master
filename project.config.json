@@ -1,5 +1,5 @@
 {
-  "description": "颠勺王 — 微信小游戏。AppID 占位为测试号，申请完成后替换 appid。",
+  "description": "颠勺王 — 微信小游戏。测试 AppID：wx2ffe6f213fe9c05b。",
   "packOptions": {
     "ignore": [
       { "type": "folder", "value": "node_modules" },
@@ -41,9 +41,9 @@
   },
   "compileType": "game",
   "libVersion": "3.5.5",
-  "appid": "touristappid",
+  "appid": "wx2ffe6f213fe9c05b",
   "projectname": "dian-shao-master",
-  "isGameTourist": true,
+  "isGameTourist": false,
   "condition": {},
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},

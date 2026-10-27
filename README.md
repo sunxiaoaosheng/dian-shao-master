@@ -10,9 +10,7 @@
 
 1. 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)，新建项目时选 **小游戏**。
 2. 导入本仓库 **根目录**（这里有 `game.js`、`game.json`、`project.config.json`）。
-3. AppID：
-   - 还没申请账号时，用测试号。项目里写的是 `touristappid`，`isGameTourist` 为 `true`。
-   - TODO(owner)：小游戏账号下来以后，把 `project.config.json` 的 `appid` 换成正式 AppID，并把 `isGameTourist` 改成 `false`。
+3. AppID 用测试号 **`wx2ffe6f213fe9c05b`**。`project.config.json` 里已经写上，`isGameTourist` 为 `false`。导入时选这个 AppID，不要改成游客测试号。
 4. 基础库按项目里的 `3.5.5` 即可，工具若提示升级，跟工具走。动作传感器需要较新的基础库，`2.3.0` 以上才有 `wx.startDeviceMotionListening`。
 5. 模拟器可以直接玩。模拟器没有真陀螺仪，底部会出现 **手动颠勺**。
 6. 改了 `src/` 之后要重新编译（见下文）。仓库里已经提交了 `dist/`，导入后不必先装依赖就能预览。
@@ -24,7 +22,7 @@
 这一段只写打开方式。本轮没有跑微信开发者工具，也没有上真机。本地先 `npm test`。
 
 1. 检出分支 `cursor/dianshao-minigame-1f26`。
-2. 开发者工具选 **小游戏**，导入仓库根目录。AppID 用测试号（`touristappid`）。
+2. 开发者工具选 **小游戏**，导入仓库根目录。AppID 用 **`wx2ffe6f213fe9c05b`**。
 3. 模拟器没有陀螺仪，对局里用底部 **手动颠勺**。
 4. 首页应看到 **试火**，以及出师条件（合成 1 次，或撑过 20 秒）。手感按钮下面有当前档的冷却秒数。
 5. 选 **家常**，点 **开炒**。

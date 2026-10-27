@@ -570,6 +570,8 @@ function testName() {
   assert.equal(pkg.name, 'dian-shao-master');
   const project = JSON.parse(fs.readFileSync(path.join(__dirname, '../project.config.json'), 'utf8'));
   assert.equal(project.projectname, 'dian-shao-master');
+  assert.equal(project.appid, 'wx2ffe6f213fe9c05b');
+  assert.equal(project.isGameTourist, false);
   assert.ok(project.description.includes('颠勺王'));
 }
 
