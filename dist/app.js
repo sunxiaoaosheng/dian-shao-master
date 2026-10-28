@@ -289,6 +289,7 @@ class Game {
         catch (err) {
             console.warn('[颠勺] 手账没画成', err);
             this.journalPath = null;
+            this.journalWait = Promise.resolve();
             return;
         }
         this.journalPath = null;
