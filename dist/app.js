@@ -3,9 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.startGame = startGame;
 const copy_1 = require("./content/copy");
 const dishes_1 = require("./content/dishes");
-const score_1 = require("./cook/score");
+const model_1 = require("./cook/model");
 const scenes_1 = require("./flow/scenes");
+const gyro_1 = require("./input/gyro");
 const pointer_1 = require("./input/pointer");
+const sensors_1 = require("./input/sensors");
 const loop_1 = require("./loop");
 const keys_1 = require("./meta/keys");
 const save_1 = require("./meta/save");
@@ -30,18 +32,28 @@ class Game {
         this.dish = null;
         this.order = null;
         this.prep = null;
+        this.prepWrong = 0;
         this.cook = null;
+        this.burnScale = 1;
         this.plate = null;
         this.teach = '';
         this.qa = false;
         this.sealTaps = 0;
         this.sealWindow = 0;
         this.lastView = null;
+        this.mux = new sensors_1.SensorMux();
+        this.sensorPhase = 'pending';
+        this.sensorGen = 0;
+        this.sensorWaitUntil = 0;
+        this.samplesSeen = 0;
         this.platform = platform;
         this.save = (0, save_1.parseSave)(platform.storageGet(keys_1.KEY_SAVE), platform.now());
+        this.detector = (0, gyro_1.createTossDetector)('standard');
         if (platform.launchQuery().qa === '1')
             this.qa = true;
         platform.onPointer((point) => this.onPointer(point.x, point.y));
+        platform.setMotionHandler((res) => this.onMotion(res));
+        platform.setAccelHandler((res) => this.onAccel(res));
         platform.setMenuShare({ title: copy_1.COPY.menuShare, query: 'from=menu' });
         (0, sprites_1.loadCollage)(() => platform.createImage());
     }
@@ -50,14 +62,7 @@ class Game {
             this.order = (0, ticket_1.tickOrder)(this.order, dt);
         if (this.screen === 'prep' && this.prep)
             this.prep = (0, board_1.tickPrep)(this.prep, dt);
-        if (this.screen === 'cook' && this.cook && this.cook.leftMs > 0) {
-            const left = Math.max(0, this.cook.leftMs - dt);
-            const elapsed = this.cook.totalMs - left;
-            const hint = this.dish ? (0, dishes_1.phaseAt)(this.dish, elapsed / this.cook.totalMs).hint : this.cook.hint;
-            this.cook = Object.assign({}, this.cook, { leftMs: left, hint });
-            if (left <= 0)
-                this.finishCook();
-        }
+        this.stepCook(dt);
         this.advance();
     }
     draw() {
@@ -76,22 +81,40 @@ class Game {
             catalog: dishes_1.DISHES,
             order: this.order,
             prep: this.prep,
-            cook: this.cook,
+            cook: this.cookView(),
             plate: this.plate,
-            teach: this.teach,
-            debugLines: this.debugLines(),
+            teach: this.sensorTeach(),
+            debugLines: this.qa && this.cook ? (0, model_1.debugCook)(this.cook) : [],
+            qa: this.qa && this.screen === 'cook',
+            offerRetry: !this.platform.isDevtools && this.screen === 'cook' && (this.sensorPhase === 'deaf' || this.sensorPhase === 'fallback'),
         };
     }
-    debugLines() {
-        if (!this.qa || !this.cook || !this.dish)
-            return [];
-        const elapsed = this.cook.totalMs - this.cook.leftMs;
-        const phase = (0, dishes_1.phaseAt)(this.dish, elapsed / this.cook.totalMs);
-        return [
-            `段 ${phase.want} 均匀/秒 ${phase.evenPerSec}`,
-            `糊边/秒 ${phase.burnPerSec} 闲置 ${phase.idleBurnPerSec}`,
-            `现在 ${Math.round(this.cook.even)} / ${Math.round(this.cook.burn)}`,
-        ];
+    cookView() {
+        if (!this.cook)
+            return null;
+        const cue = (0, model_1.cueLabel)(this.cook);
+        return {
+            even: this.cook.even,
+            burn: this.cook.burn,
+            leftMs: Math.max(0, this.cook.durationMs - this.cook.elapsedMs),
+            totalMs: this.cook.durationMs,
+            hint: cue ? `下料：${cue}` : this.cook.hint,
+        };
+    }
+    sensorTeach() {
+        if (this.teach)
+            return this.teach;
+        if (this.screen !== 'cook')
+            return '';
+        if (this.platform.isDevtools)
+            return copy_1.COPY.sensorDevtools;
+        if (this.sensorPhase === 'deaf')
+            return copy_1.COPY.sensorDeaf;
+        if (this.sensorPhase === 'fallback')
+            return copy_1.COPY.sensorFallback;
+        if (this.sensorPhase === 'live')
+            return copy_1.COPY.sensorLive;
+        return copy_1.COPY.sensorPending;
     }
     onPointer(x, y) {
         if (!this.lastView)
@@ -116,6 +139,12 @@ class Game {
             this.toss();
         else if (id === 'plate')
             this.finishCook();
+        else if (id === 'scale-up')
+            this.nudgeScale(0.2);
+        else if (id === 'scale-down')
+            this.nudgeScale(-0.2);
+        else if (id === 'retryListen')
+            this.beginSensors();
         else if (id === 'retry')
             this.retry();
         else if (id === 'album')
@@ -153,27 +182,48 @@ class Game {
     beginCook() {
         if (!this.dish)
             return;
-        const total = Math.round(this.dish.cookSeconds * 1000 * this.dish.pace);
-        this.cook = {
-            even: 0,
-            burn: 0,
-            leftMs: total,
-            totalMs: total,
-            hint: this.dish.phases[0] ? this.dish.phases[0].hint : copy_1.COPY.cookHint,
-        };
+        this.prepWrong = this.prep ? this.prep.wrong : 0;
+        this.cook = (0, model_1.createCook)(this.dish, this.burnScale);
         this.screen = (0, scenes_1.go)('prep', 'ready');
+        this.beginSensors();
+    }
+    stepCook(dt) {
+        if (!this.cook || !this.dish || this.screen !== 'cook')
+            return;
+        this.watchSensor();
+        this.cook = (0, model_1.tickCook)(this.cook, dt, this.dish);
+        if (this.cook.status !== 'cooking')
+            this.settle();
     }
     toss() {
-        if (!this.cook || this.screen !== 'cook')
+        if (!this.cook || this.screen !== 'cook' || this.cook.status !== 'cooking')
             return;
-        this.cook = Object.assign({}, this.cook, { even: Math.min(100, this.cook.even + 22) });
+        this.cook = (0, model_1.tossCook)(this.cook);
         this.platform.vibrate();
     }
     finishCook() {
+        if (!this.cook || this.screen !== 'cook' || this.cook.status !== 'cooking')
+            return;
+        this.cook = (0, model_1.plateCook)(this.cook);
+        this.settle();
+    }
+    settle() {
         if (!this.dish || !this.cook || this.screen !== 'cook')
             return;
-        const score = (0, score_1.clampScore)(this.cook.even);
-        this.publish(score, (0, score_1.ratingFor)(score), score >= 60 ? '' : '这盘还没颠匀。');
+        const graded = (0, model_1.scoreCook)(this.cook, this.prepWrong * 6);
+        const reason = this.cook.status === 'burnt'
+            ? copy_1.COPY.failBurn
+            : graded.rating === 'wreck'
+                ? '这盘还没颠匀。'
+                : '';
+        this.publish(graded.score, graded.rating, reason);
+    }
+    nudgeScale(delta) {
+        const next = Math.round((this.burnScale + delta) * 10) / 10;
+        this.burnScale = next < 0.4 ? 0.4 : next > 1.8 ? 1.8 : next;
+        if (this.cook && this.cook.status === 'cooking') {
+            this.cook = Object.assign({}, this.cook, { burnScale: this.burnScale });
+        }
     }
     fail(reason) {
         this.cook = null;
@@ -188,6 +238,7 @@ class Game {
         const note = rating === 'wreck' ? reason : applied.kept ? copy_1.COPY.kept : copy_1.COPY.skipped;
         this.plate = { dish: this.dish, score, rating, kept: applied.kept, reason: note };
         this.screen = 'plate';
+        this.stopEars();
     }
     retry() {
         if (!this.dish)
@@ -205,6 +256,90 @@ class Game {
         this.plate = null;
         this.teach = '';
         this.screen = (0, scenes_1.go)(this.screen, 'home');
+        this.stopEars();
+    }
+    beginSensors() {
+        const gen = ++this.sensorGen;
+        this.platform.stopSensors();
+        this.mux.reset();
+        this.detector = (0, gyro_1.createTossDetector)('standard');
+        this.samplesSeen = 0;
+        if (this.platform.isDevtools) {
+            this.sensorPhase = 'fallback';
+            return;
+        }
+        this.sensorPhase = 'pending';
+        this.sensorWaitUntil = Number.POSITIVE_INFINITY;
+        void this.openSensors(gen);
+    }
+    async openSensors(gen) {
+        if (this.platform.isDevtools)
+            return;
+        const motionPromise = this.platform.startMotion();
+        const accelPromise = this.platform.startAccel();
+        const motion = await motionPromise;
+        const accel = await accelPromise;
+        if (gen !== this.sensorGen || this.screen !== 'cook')
+            return;
+        if (motion === 'ok' || accel === 'ok') {
+            if (this.sensorPhase !== 'live') {
+                this.sensorPhase = 'pending';
+                this.sensorWaitUntil = this.platform.now() + 1500;
+            }
+            return;
+        }
+        if (motion === 'unsupported' && accel === 'unsupported') {
+            this.sensorPhase = 'fallback';
+            return;
+        }
+        const consent = await this.platform.requestMotionConsent();
+        if (gen !== this.sensorGen || this.screen !== 'cook')
+            return;
+        if (consent === 'granted') {
+            const againMotion = await this.platform.startMotion();
+            const againAccel = await this.platform.startAccel();
+            if (gen !== this.sensorGen || this.screen !== 'cook')
+                return;
+            if (againMotion === 'ok' || againAccel === 'ok') {
+                this.sensorPhase = 'pending';
+                this.sensorWaitUntil = this.platform.now() + 1500;
+                return;
+            }
+        }
+        this.sensorPhase = 'deaf';
+    }
+    watchSensor() {
+        if (this.platform.isDevtools || this.sensorPhase !== 'pending')
+            return;
+        if (this.platform.now() <= this.sensorWaitUntil)
+            return;
+        if (this.samplesSeen > 0 && this.detector.isLive()) {
+            this.sensorPhase = 'live';
+            return;
+        }
+        this.sensorPhase = 'deaf';
+    }
+    onMotion(res) {
+        if (this.screen !== 'cook')
+            return;
+        this.feed(this.mux.motion(res, this.platform.now()));
+    }
+    onAccel(res) {
+        if (this.screen !== 'cook')
+            return;
+        this.feed(this.mux.accel(res, this.platform.now()));
+    }
+    feed(sample) {
+        this.samplesSeen += 1;
+        const event = this.detector.push(sample);
+        if (this.detector.isLive())
+            this.sensorPhase = 'live';
+        if (event)
+            this.toss();
+    }
+    stopEars() {
+        this.sensorGen += 1;
+        this.platform.stopSensors();
     }
     advance() {
         if (!this.prep || this.screen !== 'prep') {

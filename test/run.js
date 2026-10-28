@@ -29,6 +29,8 @@ const {
 const { go } = require('../dist/flow/scenes');
 const { createOrder, tickOrder, acceptOrder } = require('../dist/order/ticket');
 const { createPrep, tapPrep, PREP_MAX_WRONG } = require('../dist/prep/board');
+const { createCook, tickCook, tossCook, scoreCook, plateCook } = require('../dist/cook/model');
+const { phaseAt: phaseOf } = require('../dist/content/dishes');
 
 function testDishes() {
   assert.equal(validateDishes(DISHES).length, 0, validateDishes(DISHES).join('；'));
@@ -98,6 +100,51 @@ function testFlow() {
   for (let i = 0; i < dish.need.length; i += 1) prep = tapPrep(prep, dish.need[i].id);
   assert.equal(prep.status, 'ready');
   assert.equal(PREP_MAX_WRONG, 3);
+}
+
+function playDish(dish, policy) {
+  let cook = createCook(dish, 1);
+  let guard = 0;
+  while (cook.status === 'cooking' && guard < 800) {
+    const progress = cook.durationMs <= 0 ? 1 : cook.elapsedMs / cook.durationMs;
+    const phase = phaseOf(dish, progress);
+    const inDrop = cook.drops.some((drop) => {
+      if (drop.hit || drop.missed) return false;
+      const center = drop.at * cook.durationMs;
+      const half = drop.window * cook.durationMs;
+      return Math.abs(cook.elapsedMs - center) <= half;
+    });
+    const shouldToss = policy === 'always' || (policy === 'follow' && (phase.want === 'toss' || inDrop));
+    if (shouldToss && cook.pulseMs <= 0) cook = tossCook(cook);
+    cook = tickCook(cook, 50, dish);
+    guard += 1;
+  }
+  return cook;
+}
+
+function testCook() {
+  const dish = dishById('fanqie');
+  const good = playDish(dish, 'follow');
+  const goodGrade = scoreCook(good, 0);
+  assert.equal(good.status, 'plated', `跟着曲线应能出锅，实际 ${good.status} 糊边 ${good.burn}`);
+  assert.ok(goodGrade.score >= 60, `跟着曲线至少及格，实际 ${goodGrade.score} 均匀 ${good.even} 糊边 ${good.burn} 下料 ${goodGrade.dropsHit}/${goodGrade.dropsTotal}`);
+  assert.equal(goodGrade.dropsHit, dish.drops.length);
+  const bad = playDish(dish, 'always');
+  assert.equal(bad.status, 'burnt', `一直猛颠应该糊，糊边 ${bad.burn}`);
+  assert.equal(scoreCook(bad, 0).rating, 'wreck');
+  assert.equal(scoreCook(bad, 0).score, 0);
+  const quiet = playDish(dish, 'never');
+  assert.equal(quiet.status, 'plated');
+  assert.equal(scoreCook(quiet, 0).rating, 'wreck');
+  const early = plateCook(createCook(dish, 1));
+  assert.equal(early.status, 'plated');
+  assert.equal(scoreCook(early, 0).rating, 'wreck');
+  const now = Date.parse('2026-10-28T12:00:00');
+  const save = emptySave(now);
+  const kept = applyPlate(save, { dishId: 'fanqie', score: 88, rating: 'sign', at: now }, now);
+  const retry = applyPlate(kept.save, { dishId: 'fanqie', score: 0, rating: 'wreck', at: now + 1 }, now);
+  assert.equal(retry.kept, false);
+  assert.equal(retry.save.plates.fanqie.score, 88);
 }
 
 function testProject() {
@@ -186,6 +233,7 @@ testDishes();
 testScore();
 testSave();
 testFlow();
+testCook();
 testProject();
 testBoot();
 console.log('颠勺王测试通过');

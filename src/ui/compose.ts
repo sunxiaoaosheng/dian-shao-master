@@ -1,6 +1,5 @@
 import { COPY, clearLine, clockLabel, ratingLabel, todayLine, windowLine } from '../content/copy';
 import type { Dish } from '../content/dishes';
-import { ratingFor } from '../cook/score';
 import type { Rating } from '../cook/score';
 import type { ScreenId } from '../flow/scenes';
 import type { SaveState } from '../meta/save';
@@ -40,6 +39,8 @@ export interface ComposeInput {
   plate: PlateView | null;
   teach: string;
   debugLines: string[];
+  qa: boolean;
+  offerRetry: boolean;
 }
 
 export function compose(input: ComposeInput): ViewModel {
@@ -152,8 +153,15 @@ function layoutCook(input: ComposeInput, vm: ViewModel): void {
   vm.even = cook ? cook.even / 100 : 0;
   vm.burn = cook ? cook.burn / 100 : 0;
   vm.hint = input.teach || (cook ? cook.hint : COPY.cookHint);
-  vm.lines = cook ? [`这下大约 ${ratingLabel(ratingFor(cook.even))}`] : [];
-  const y = input.height - input.safeBottom - 120;
+  vm.lines = cook ? [`均匀 ${Math.round(cook.even)}  糊边 ${Math.round(cook.burn)}`] : [];
+  let y = input.height - input.safeBottom - 120;
+  if (input.offerRetry) {
+    vm.buttons.push(button('retryListen', COPY.retryListen, 18, y - 52, 120, 40, false, false));
+  }
+  if (input.qa) {
+    vm.buttons.push(button('scale-down', '火轻一点', input.width - 250, y - 52, 110, 40, false, false));
+    vm.buttons.push(button('scale-up', '火猛一点', input.width - 132, y - 52, 110, 40, false, false));
+  }
   vm.buttons.push(button('toss', COPY.toss, 18, y, input.width - 36, 48, true, false));
   vm.buttons.push(button('plate', COPY.plate, 18, y + 58, input.width - 36, 44, false, false));
 }

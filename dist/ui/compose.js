@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.compose = compose;
 const copy_1 = require("../content/copy");
-const score_1 = require("../cook/score");
 const save_1 = require("../meta/save");
 const dishes_1 = require("../content/dishes");
 function compose(input) {
@@ -109,8 +108,15 @@ function layoutCook(input, vm) {
     vm.even = cook ? cook.even / 100 : 0;
     vm.burn = cook ? cook.burn / 100 : 0;
     vm.hint = input.teach || (cook ? cook.hint : copy_1.COPY.cookHint);
-    vm.lines = cook ? [`这下大约 ${(0, copy_1.ratingLabel)((0, score_1.ratingFor)(cook.even))}`] : [];
-    const y = input.height - input.safeBottom - 120;
+    vm.lines = cook ? [`均匀 ${Math.round(cook.even)}  糊边 ${Math.round(cook.burn)}`] : [];
+    let y = input.height - input.safeBottom - 120;
+    if (input.offerRetry) {
+        vm.buttons.push(button('retryListen', copy_1.COPY.retryListen, 18, y - 52, 120, 40, false, false));
+    }
+    if (input.qa) {
+        vm.buttons.push(button('scale-down', '火轻一点', input.width - 250, y - 52, 110, 40, false, false));
+        vm.buttons.push(button('scale-up', '火猛一点', input.width - 132, y - 52, 110, 40, false, false));
+    }
     vm.buttons.push(button('toss', copy_1.COPY.toss, 18, y, input.width - 36, 48, true, false));
     vm.buttons.push(button('plate', copy_1.COPY.plate, 18, y + 58, input.width - 36, 44, false, false));
 }
