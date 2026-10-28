@@ -28,6 +28,7 @@ const {
 } = require('../dist/meta/save');
 const { go } = require('../dist/flow/scenes');
 const { clearLine, todayLine, windowLine } = require('../dist/content/copy');
+const { homeLines } = require('../dist/meta/home');
 const { JOURNAL_W, JOURNAL_H, paintJournal } = require('../dist/plate/journal');
 const { createOrder, tickOrder, acceptOrder } = require('../dist/order/ticket');
 const { createPrep, tapPrep, tickPrep, PREP_MAX_WRONG } = require('../dist/prep/board');
@@ -104,6 +105,13 @@ function testSave() {
   const passOnly = applyPlate(emptySave(now), { dishId: 'fanqie', score: 70, rating: 'pass', at: now }, now);
   assert.equal(showcaseOf(passOnly.save), null);
   assert.equal(clearLine(2, 6), '通关 2/6');
+  const freshHome = homeLines(emptySave(now), DISHES);
+  assert.equal(freshHome[0], '通关 0/6');
+  assert.ok(freshHome[1].includes('今日最佳'));
+  assert.ok(freshHome[2].includes('橱窗'));
+  const shown = homeLines(better.save, DISHES);
+  assert.ok(shown[2].includes('招牌'));
+  assert.ok(shown[2].includes('番茄炒蛋'));
   assert.ok(todayLine(0, '').includes('还没有'));
   assert.ok(windowLine('god', '葱爆羊肉', 95).includes('神菜'));
   assert.equal(JOURNAL_W * 16, JOURNAL_H * 9);

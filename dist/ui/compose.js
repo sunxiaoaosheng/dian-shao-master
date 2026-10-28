@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.compose = compose;
 const copy_1 = require("../content/copy");
+const home_1 = require("../meta/home");
 const save_1 = require("../meta/save");
 const dishes_1 = require("../content/dishes");
 function compose(input) {
@@ -46,14 +47,7 @@ function compose(input) {
     return vm;
 }
 function layoutHome(input, vm) {
-    const done = (0, save_1.clearedCount)(input.save, input.catalog);
-    const show = (0, save_1.showcaseOf)(input.save);
-    const showDish = show ? dishName(input.catalog, show.dishId) : '';
-    vm.lines = [
-        (0, copy_1.clearLine)(done, dishes_1.SERVICE_COUNT),
-        (0, copy_1.todayLine)(input.save.today.score, dishName(input.catalog, input.save.today.dishId)),
-        (0, copy_1.windowLine)(show ? show.rating : null, showDish, show ? show.score : 0),
-    ];
+    vm.lines = (0, home_1.homeLines)(input.save, input.catalog);
     let y = input.safeTop + 168;
     const catalog = input.catalog;
     for (let i = 0; i < catalog.length; i += 1) {
@@ -125,7 +119,7 @@ function layoutPlate(input, vm) {
     vm.title = plate ? (0, copy_1.ratingLabel)(plate.rating) : '';
     vm.subtitle = plate ? plate.dish.name : '';
     vm.lines = plate
-        ? [`${plate.score} 分`, plate.dish.quips[plate.rating], plate.dish.science, plate.reason]
+        ? [`${plate.score} 分`, plate.dish.quips[plate.rating], plate.dish.science, copy_1.COPY.journalNote, plate.reason]
         : [];
     let y = input.safeTop + 280;
     if (plate && plate.rating === 'wreck') {
@@ -164,11 +158,4 @@ function layoutClear(input, vm) {
 }
 function button(id, label, x, y, w, h, primary, disabled) {
     return { id, label, x, y, w, h, primary, disabled };
-}
-function dishName(catalog, id) {
-    for (let i = 0; i < catalog.length; i += 1) {
-        if (catalog[i].id === id)
-            return catalog[i].name;
-    }
-    return '';
 }

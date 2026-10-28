@@ -32,6 +32,7 @@ export const COPY = {
   teachOrder: '先接这一单。客人点了名，时限写在上面。',
   teachPrep: '只点这道菜要的料。点错三次，这单就得重做。',
   teachCook: '字说「颠」的时候再颠。字说「停」还猛颠，糊边会涨。',
+  journalNote: '手账在这一页，分享自愿，也可以存进相册。',
   clearTitle: '六桌都过了',
   clearBody: '今晚这六桌，你都至少做出了及格的一盘。',
   failTimeout: '这单超时了，可以免费重做。',

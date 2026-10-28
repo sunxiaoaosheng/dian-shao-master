@@ -1,9 +1,10 @@
-import { COPY, clearLine, clockLabel, ratingLabel, todayLine, windowLine } from '../content/copy';
+import { COPY, clearLine, clockLabel, ratingLabel } from '../content/copy';
 import type { Dish } from '../content/dishes';
 import type { Rating } from '../cook/score';
 import type { ScreenId } from '../flow/scenes';
 import type { SaveState } from '../meta/save';
-import { clearedCount, isUnlocked, showcaseOf } from '../meta/save';
+import { homeLines } from '../meta/home';
+import { clearedCount, isUnlocked } from '../meta/save';
 import { SERVICE_COUNT } from '../content/dishes';
 import type { OrderState } from '../order/ticket';
 import type { PrepState } from '../prep/board';
@@ -80,14 +81,7 @@ export function compose(input: ComposeInput): ViewModel {
 }
 
 function layoutHome(input: ComposeInput, vm: ViewModel): void {
-  const done = clearedCount(input.save, input.catalog);
-  const show = showcaseOf(input.save);
-  const showDish = show ? dishName(input.catalog, show.dishId) : '';
-  vm.lines = [
-    clearLine(done, SERVICE_COUNT),
-    todayLine(input.save.today.score, dishName(input.catalog, input.save.today.dishId)),
-    windowLine(show ? show.rating : null, showDish, show ? show.score : 0),
-  ];
+  vm.lines = homeLines(input.save, input.catalog);
   let y = input.safeTop + 168;
   const catalog = input.catalog;
   for (let i = 0; i < catalog.length; i += 1) {
@@ -172,7 +166,7 @@ function layoutPlate(input: ComposeInput, vm: ViewModel): void {
   vm.title = plate ? ratingLabel(plate.rating) : '';
   vm.subtitle = plate ? plate.dish.name : '';
   vm.lines = plate
-    ? [`${plate.score} 分`, plate.dish.quips[plate.rating], plate.dish.science, plate.reason]
+    ? [`${plate.score} 分`, plate.dish.quips[plate.rating], plate.dish.science, COPY.journalNote, plate.reason]
     : [];
   let y = input.safeTop + 280;
   if (plate && plate.rating === 'wreck') {
@@ -214,11 +208,4 @@ function layoutClear(input: ComposeInput, vm: ViewModel): void {
 
 function button(id: string, label: string, x: number, y: number, w: number, h: number, primary: boolean, disabled: boolean): ButtonVM {
   return { id, label, x, y, w, h, primary, disabled };
-}
-
-function dishName(catalog: readonly Dish[], id: string): string {
-  for (let i = 0; i < catalog.length; i += 1) {
-    if (catalog[i].id === id) return catalog[i].name;
-  }
-  return '';
 }
