@@ -1,27 +1,27 @@
-/** 实拍剪贴：牛皮纸、红油、葱花、酱油。不要换成办公文具色。 */
+/** 老字号菜单：宣纸、朱印、墨线。标题粗，正文细。 */
 export const PALETTE = {
-  paper: '#e7d3ae',
-  paperDeep: '#d4b48a',
-  fiber: '#b08960',
-  ink: '#2b2118',
-  inkSoft: '#5c4a3a',
-  chili: '#c4452d',
-  chiliDeep: '#8d2b1c',
-  scallion: '#3f7d45',
-  yolk: '#e3b23c',
+  paper: '#f3e6c8',
+  paperDeep: '#e4d0a4',
+  fiber: '#c4a882',
+  ink: '#1c140f',
+  inkSoft: '#5c4636',
+  chili: '#9c2b1f',
+  chiliDeep: '#6e1c14',
+  scallion: '#3d4a28',
+  yolk: '#d7b15a',
   soy: '#3a241c',
-  iron: '#2a2e32',
-  ironLite: '#8b9298',
-  steam: '#f7f1e6',
-  photo: '#f6efe2',
+  iron: '#1a1c1f',
+  ironLite: '#8d8376',
+  steam: '#d9d0c2',
+  photo: '#f7f0df',
   tape: '#e6d07a',
   tapeEdge: '#c9b15a',
-  white: '#fbf6ec',
-  burnt: '#4a4038',
-  seal: '#b4332a',
+  white: '#f7f1e4',
+  burnt: '#3a3028',
+  seal: '#9c2b1f',
 };
 
 export function font(size: number, bold = false): string {
-  const weight = bold ? '700' : '500';
-  return `${weight} ${size}px "KaiTi","STKaiti","Kaiti SC","Songti SC","SimSun",serif`;
+  const weight = bold ? '700' : '400';
+  return `${weight} ${size}px "Songti SC","STSong","SimSun","Noto Serif CJK SC","Source Han Serif SC",serif`;
 }

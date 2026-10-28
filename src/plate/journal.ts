@@ -1,11 +1,11 @@
-import { COPY, ratingLabel } from '../content/copy';
+import { ratingLabel } from '../content/copy';
 import type { Rating } from '../cook/score';
 import type { Ctx } from '../ui/ctx';
-import { drawTape, drawWrapped, fillTorn, paintPaper } from '../ui/draw';
-import { drawFood } from '../ui/scraps';
+import { drawWrapped } from '../ui/draw';
+import { drawMenuFrame, drawMenuRule, drawRoundSeal, drawWoodWok, paintSheet } from '../ui/press';
 import { PALETTE, font } from '../ui/theme';
 
-/** 出锅强制的一帧手账。9:16，方便分享。 */
+/** 出锅强制的一帧手账。9:16，老字号竖版传单。 */
 export const JOURNAL_W = 540;
 export const JOURNAL_H = 960;
 
@@ -19,65 +19,34 @@ export interface JournalCard {
 }
 
 export function paintJournal(ctx: Ctx, card: JournalCard): void {
-  paintPaper(ctx, JOURNAL_W, JOURNAL_H);
-  ctx.save();
-  ctx.translate(28, 36);
-  ctx.rotate(-0.015);
-  fillTorn(ctx, JOURNAL_W - 56, JOURNAL_H - 72, 7, PALETTE.white, 0.045);
-  ctx.restore();
-  drawTape(ctx, 160, 48, 120, -0.35);
-  drawTape(ctx, 400, 70, 90, 0.2);
-
-  ctx.save();
-  ctx.translate(70, 110);
-  ctx.rotate(0.03);
-  fillTorn(ctx, 400, 430, 4, '#efe2cc', 0.04);
-  ctx.fillStyle = card.rating === 'wreck' ? '#5c5148' : PALETTE.chili;
-  ctx.fillRect(28, 28, 344, 250);
-  drawFood(ctx, 'tomato', 120, 150, 70);
-  drawFood(ctx, 'egg', 210, 160, 64);
-  drawFood(ctx, 'scallion', 280, 150, 60);
-  ctx.fillStyle = PALETTE.ink;
-  ctx.font = font(16, false);
+  paintSheet(ctx, JOURNAL_W, JOURNAL_H);
+  drawMenuFrame(ctx, JOURNAL_W, JOURNAL_H);
+  ctx.fillStyle = PALETTE.chili;
+  ctx.font = font(16, true);
   ctx.textAlign = 'center';
-  ctx.fillText(card.region, 200, 310);
-  ctx.restore();
-
-  ctx.save();
-  ctx.translate(390, 250);
-  ctx.rotate(-0.12);
-  ctx.beginPath();
-  ctx.arc(0, 0, 52, 0, Math.PI * 2);
-  ctx.fillStyle = PALETTE.seal;
-  ctx.fill();
-  ctx.strokeStyle = '#f3d2c4';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.fillStyle = '#f8e6df';
-  ctx.font = font(26, true);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(ratingLabel(card.rating), 0, 0);
-  ctx.restore();
-
-  ctx.fillStyle = PALETTE.chiliDeep;
-  ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.font = font(18, false);
-  ctx.fillText(COPY.title, 64, 560);
+  ctx.fillText('老字号 · 颠勺王', JOURNAL_W / 2, 36);
+  drawMenuRule(ctx, 70, 64, JOURNAL_W - 140);
   ctx.fillStyle = PALETTE.ink;
-  ctx.font = font(40, true);
-  ctx.fillText(card.dish, 64, 590);
-  ctx.font = font(26, true);
-  ctx.fillText(`${card.score} 分`, 64, 648);
-  ctx.font = font(22, false);
-  drawWrapped(ctx, card.quip, 64, 700, JOURNAL_W - 128, 32);
-  ctx.save();
-  ctx.translate(48, 780);
-  ctx.rotate(-0.02);
-  fillTorn(ctx, JOURNAL_W - 96, 110, 9, '#f7f1e4', 0.04);
+  ctx.font = font(42, true);
+  ctx.fillText(card.dish, JOURNAL_W / 2, 84);
+  ctx.fillStyle = PALETTE.chili;
+  ctx.font = font(16, false);
+  ctx.fillText(card.region, JOURNAL_W / 2, 136);
+  drawWoodWok(ctx, 50, 160, JOURNAL_W - 100, 420, 0.8, card.rating === 'wreck' ? 0.85 : 0.15, false);
+  drawRoundSeal(ctx, JOURNAL_W - 110, 500, 58, ratingLabel(card.rating));
+  ctx.fillStyle = PALETTE.ink;
+  ctx.font = font(28, true);
+  ctx.fillText(`${card.score} 分`, JOURNAL_W / 2, 600);
+  ctx.font = font(20, false);
+  ctx.textAlign = 'left';
+  drawWrapped(ctx, card.quip, 64, 650, JOURNAL_W - 128, 28);
+  drawMenuRule(ctx, 64, 720, JOURNAL_W - 128);
   ctx.fillStyle = PALETTE.inkSoft;
-  ctx.font = font(18, false);
-  drawWrapped(ctx, card.science, 16, 18, JOURNAL_W - 130, 26);
-  ctx.restore();
+  ctx.font = font(16, false);
+  drawWrapped(ctx, card.science, 64, 736, JOURNAL_W - 128, 26);
+  ctx.fillStyle = PALETTE.chili;
+  ctx.font = font(14, true);
+  ctx.textAlign = 'center';
+  ctx.fillText('今晚六桌', JOURNAL_W / 2, 880);
 }

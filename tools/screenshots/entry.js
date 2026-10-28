@@ -125,13 +125,13 @@ function scenes() {
   clear.save = passedSave();
 
   return {
-    '01-home-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(home)) },
-    '02-order-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(order)) },
-    '03-prep-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(prep)) },
-    '04-cook-toss-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookToss)) },
-    '05-cook-hold-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookHold)) },
-    '06-plate-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(plate)) },
-    '07-journal-v2': {
+    '01-home-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(home)) },
+    '02-order-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(order)) },
+    '03-prep-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(prep)) },
+    '04-cook-toss-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookToss)) },
+    '05-cook-hold-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookHold)) },
+    '06-plate-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(plate)) },
+    '07-journal-v3': {
       w: JOURNAL_W,
       h: JOURNAL_H,
       draw: (ctx) => paintJournal(ctx, {
@@ -143,8 +143,8 @@ function scenes() {
         score: 88,
       }),
     },
-    '08-album-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(album)) },
-    '09-clear-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(clear)) },
+    '08-album-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(album)) },
+    '09-clear-v3': { w: W, h: H, draw: (ctx) => paint(ctx, compose(clear)) },
   };
 }
 

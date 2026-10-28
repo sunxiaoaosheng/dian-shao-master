@@ -100,7 +100,7 @@ function layoutPrep(input, vm) {
             shape: piece.id,
             role: piece.role,
             x: 18 + col * (colW + 16),
-            y: input.safeTop + 168 + row * 92,
+            y: input.safeTop + 248 + row * 92,
             w: colW,
             h: 80,
             got: piece.got,
