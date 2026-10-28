@@ -16,9 +16,9 @@ const board_1 = require("./prep/board");
 const compose_1 = require("./ui/compose");
 const paint_1 = require("./ui/paint");
 const sprites_1 = require("./ui/sprites");
-/** v1 先把流程走通。v3 再打开限时和错料。 */
-const ENFORCE = false;
-const SHOW_DECOYS = false;
+/** 接单和备料都计时。错点满三次，或时间到还没备齐，这单失败。 */
+const ENFORCE = true;
+const SHOW_DECOYS = true;
 function startGame(platform) {
     const app = new Game(platform);
     (0, loop_1.runLoop)((dt) => {

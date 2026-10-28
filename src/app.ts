@@ -25,9 +25,9 @@ import { paint } from './ui/paint';
 import { loadCollage } from './ui/sprites';
 import type { ViewModel } from './ui/types';
 
-/** v1 先把流程走通。v3 再打开限时和错料。 */
-const ENFORCE = false;
-const SHOW_DECOYS = false;
+/** 接单和备料都计时。错点满三次，或时间到还没备齐，这单失败。 */
+const ENFORCE = true;
+const SHOW_DECOYS = true;
 
 export function startGame(platform: Platform): void {
   const app = new Game(platform);

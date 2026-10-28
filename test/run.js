@@ -28,7 +28,7 @@ const {
 } = require('../dist/meta/save');
 const { go } = require('../dist/flow/scenes');
 const { createOrder, tickOrder, acceptOrder } = require('../dist/order/ticket');
-const { createPrep, tapPrep, PREP_MAX_WRONG } = require('../dist/prep/board');
+const { createPrep, tapPrep, tickPrep, PREP_MAX_WRONG } = require('../dist/prep/board');
 const { createCook, tickCook, tossCook, scoreCook, plateCook } = require('../dist/cook/model');
 const { phaseAt: phaseOf } = require('../dist/content/dishes');
 
@@ -37,6 +37,9 @@ function testDishes() {
   assert.equal(SERVICE_COUNT, 6);
   assert.equal(DISHES[0].id, 'fanqie');
   assert.equal(DISHES[0].name, '番茄炒蛋');
+  assert.deepEqual(DISHES.map((dish) => dish.id), ['fanqie', 'youmai', 'chaofan']);
+  const youmai = dishById('youmai');
+  assert.ok(createOrder(youmai, true).totalMs < youmai.orderSeconds * 1000);
   assert.ok(phaseAt(DISHES[0], 0).hint.includes('蛋'));
   assert.equal(phaseAt(DISHES[0], 1).want, 'toss');
   const broken = [Object.assign({}, DISHES[0], { science: '菜'.repeat(31) })];
@@ -100,6 +103,22 @@ function testFlow() {
   for (let i = 0; i < dish.need.length; i += 1) prep = tapPrep(prep, dish.need[i].id);
   assert.equal(prep.status, 'ready');
   assert.equal(PREP_MAX_WRONG, 3);
+  const shown = createPrep(dish, true, true);
+  assert.ok(shown.pieces.some((piece) => piece.role === 'decoy'));
+  assert.ok(!shown.pieces.some((piece) => piece.role === 'taboo'));
+  const spicy = Object.assign({}, dish, { taboo: '少辣' });
+  let wrong = createPrep(spicy, true, true);
+  assert.ok(wrong.pieces.some((piece) => piece.role === 'taboo' && piece.id === 'pepper'));
+  wrong = tapPrep(wrong, 'pepper');
+  wrong = tapPrep(wrong, 'pepper');
+  wrong = tapPrep(wrong, 'pepper');
+  assert.equal(wrong.status, 'wrong');
+  const slow = tickPrep(createPrep(dish, true, true), dish.prepSeconds * 1000 + 40);
+  assert.equal(slow.status, 'timeout');
+  let partial = createPrep(dish, true, true);
+  partial = tapPrep(partial, 'potato');
+  assert.equal(partial.wrong, 1);
+  assert.equal(partial.status, 'working');
 }
 
 function playDish(dish, policy) {
@@ -124,6 +143,12 @@ function playDish(dish, policy) {
 
 function testCook() {
   const dish = dishById('fanqie');
+  for (let i = 0; i < DISHES.length; i += 1) {
+    const followed = playDish(DISHES[i], 'follow');
+    const followedGrade = scoreCook(followed, 0);
+    assert.equal(followed.status, 'plated', `${DISHES[i].name} 跟着曲线应出锅`);
+    assert.ok(followedGrade.score >= 60, `${DISHES[i].name} 跟着曲线应及格，实际 ${followedGrade.score}`);
+  }
   const good = playDish(dish, 'follow');
   const goodGrade = scoreCook(good, 0);
   assert.equal(good.status, 'plated', `跟着曲线应能出锅，实际 ${good.status} 糊边 ${good.burn}`);

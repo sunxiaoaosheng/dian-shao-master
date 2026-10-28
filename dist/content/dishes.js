@@ -10,6 +10,9 @@ const TOMATO = { id: 'tomato', name: '番茄', ink: '#c4452d' };
 const SCALLION = { id: 'scallion', name: '葱', ink: '#3f7d45' };
 const PEPPER = { id: 'pepper', name: '干辣椒', ink: '#8d2b1c' };
 const POTATO = { id: 'potato', name: '土豆', ink: '#c4a574' };
+const GARLIC = { id: 'garlic', name: '蒜', ink: '#f3e6cf' };
+const LETTUCE = { id: 'lettuce', name: '油麦菜', ink: '#3f7d45' };
+const RICE = { id: 'rice', name: '米饭', ink: '#f6efe2' };
 /** 今晚六桌。配置还没齐的时候，主页分母也按六算。 */
 exports.SERVICE_COUNT = 6;
 exports.DISHES = [
@@ -46,6 +49,73 @@ exports.DISHES = [
             { id: 'egg-in', at: 0.18, window: 0.08, label: '下蛋液', kind: 'drop' },
             { id: 'tomato-in', at: 0.5, window: 0.08, label: '下番茄', kind: 'drop' },
             { id: 'egg-back', at: 0.88, window: 0.07, label: '蛋回锅', kind: 'late' },
+        ],
+    },
+    {
+        id: 'youmai',
+        name: '蒜蓉油麦菜',
+        region: '粤',
+        style: '大火快颠，断生即出',
+        gate: 'open',
+        science: '油麦菜断生就出，多颠几下叶子会塌、会黄。',
+        album: '粤式快手：蒜片先下，油麦菜跟着下，大火颠到叶子刚软就出。停在锅里会出汤，颜色发暗。',
+        quips: {
+            wreck: '叶子塌了，蒜也糊了。',
+            pass: '断生了，还是脆的。',
+            sign: '这碟青菜能上台。',
+            god: '火候卡在刚好断生。',
+        },
+        orderSeconds: 12,
+        pace: 0.85,
+        taboo: null,
+        prepSeconds: 14,
+        need: [GARLIC, LETTUCE],
+        decoys: [POTATO],
+        tabooPiece: PEPPER,
+        cookSeconds: 9,
+        phases: [
+            { until: 0.72, want: 'toss', evenPerSec: 24, burnPerSec: 36, idleBurnPerSec: 14, hint: '颠：大火快颠，求断生' },
+            { until: 1, want: 'hold', evenPerSec: 6, burnPerSec: 70, idleBurnPerSec: 4, hint: '停：马上出，再颠就糊' },
+        ],
+        drops: [
+            { id: 'garlic-in', at: 0.12, window: 0.08, label: '下蒜', kind: 'drop' },
+            { id: 'lettuce-in', at: 0.28, window: 0.08, label: '下油麦菜', kind: 'drop' },
+        ],
+    },
+    {
+        id: 'chaofan',
+        name: '扬州炒饭',
+        region: '淮扬',
+        style: '颠匀，粒粒分明',
+        gate: 'open',
+        science: '饭粒要先散开再下蛋，葱花留到最后。',
+        album: '淮扬主食：隔夜饭下锅颠散，蛋液沿着锅边走，饭粒分开后再下葱。一直闷着会结块。',
+        quips: {
+            wreck: '饭结块了。',
+            pass: '粒粒还分得开。',
+            sign: '这锅饭能上桌。',
+            god: '粒粒分明，葱香刚到。',
+        },
+        orderSeconds: 16,
+        pace: 1,
+        taboo: null,
+        prepSeconds: 18,
+        need: [RICE, EGG, SCALLION],
+        decoys: [POTATO],
+        tabooPiece: PEPPER,
+        cookSeconds: 14,
+        phases: [
+            { until: 0.22, want: 'toss', evenPerSec: 18, burnPerSec: 32, idleBurnPerSec: 8, hint: '颠：先把饭粒颠散' },
+            { until: 0.38, want: 'hold', evenPerSec: 4, burnPerSec: 36, idleBurnPerSec: 2, hint: '停：让蛋沿锅边走' },
+            { until: 0.62, want: 'toss', evenPerSec: 16, burnPerSec: 30, idleBurnPerSec: 7, hint: '颠：饭和蛋要分开' },
+            { until: 0.76, want: 'hold', evenPerSec: 4, burnPerSec: 34, idleBurnPerSec: 2, hint: '停：别把饭颠糊' },
+            { until: 0.92, want: 'toss', evenPerSec: 14, burnPerSec: 28, idleBurnPerSec: 6, hint: '颠：葱花下了，颠匀' },
+            { until: 1, want: 'hold', evenPerSec: 3, burnPerSec: 40, idleBurnPerSec: 2, hint: '停：出锅' },
+        ],
+        drops: [
+            { id: 'rice-in', at: 0.1, window: 0.08, label: '下米饭', kind: 'drop' },
+            { id: 'egg-in', at: 0.32, window: 0.07, label: '下蛋液', kind: 'drop' },
+            { id: 'scallion-in', at: 0.84, window: 0.07, label: '下葱花', kind: 'late' },
         ],
     },
 ];
