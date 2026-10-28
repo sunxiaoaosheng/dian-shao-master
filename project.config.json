@@ -4,6 +4,7 @@
     "ignore": [
       { "type": "folder", "value": "node_modules" },
       { "type": "folder", "value": "test" },
+      { "type": "folder", "value": "tools/screenshots" },
       { "type": "suffix", "value": ".map" },
       { "type": "suffix", "value": ".ts" },
       { "type": "file", "value": "package.json" },
