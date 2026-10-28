@@ -48,7 +48,7 @@
 
 ## v6 打磨与提测
 
-- [ ] 首单带教、震动、传感器失败兜底
-- [ ] `docs/PRIVACY.md`、`docs/TESTING.md`、README
+- [x] 首单带教、震动、传感器失败兜底
+- [x] `docs/PRIVACY.md`、`docs/TESTING.md`、README
 
 怎么验证：`npm test`。真机清单以 `docs/TESTING.md` 为准，本仓库的自动化测试代替不了真机陀螺仪。

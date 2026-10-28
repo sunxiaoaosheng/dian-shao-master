@@ -27,7 +27,7 @@ const {
   passed,
 } = require('../dist/meta/save');
 const { go } = require('../dist/flow/scenes');
-const { clearLine, todayLine, windowLine } = require('../dist/content/copy');
+const { COPY, clearLine, todayLine, windowLine } = require('../dist/content/copy');
 const { homeLines } = require('../dist/meta/home');
 const { JOURNAL_W, JOURNAL_H, paintJournal } = require('../dist/plate/journal');
 const { createOrder, tickOrder, acceptOrder } = require('../dist/order/ticket');
@@ -231,6 +231,16 @@ function testProject() {
   const app = fs.readFileSync(path.join(root, 'src/app.ts'), 'utf8');
   assert.ok(!app.includes('createSession'));
   assert.ok(!app.includes('resolveMerges'));
+  assert.ok(!app.includes('openMotionSettings'));
+  assert.ok(app.includes('tutorialDone'));
+  assert.ok(app.includes('sensorDeaf'));
+  assert.ok(COPY.teachOrder.includes('接'));
+  assert.ok(COPY.teachPrep.includes('点错'));
+  assert.ok(COPY.teachCook.includes('停'));
+  assert.ok(fs.existsSync(path.join(root, 'docs/PRIVACY.md')));
+  assert.ok(fs.existsSync(path.join(root, 'docs/TESTING.md')));
+  assert.ok(fs.readFileSync(path.join(root, 'docs/PRIVACY.md'), 'utf8').includes('方向传感器'));
+  assert.ok(fs.readFileSync(path.join(root, 'docs/PRIVACY.md'), 'utf8').includes('加速传感器'));
   const banned = /工位|周报|KPI|OKR|打卡|同事|老板|会议|PPT|职场|格子间|加班|最后一格|需求文档|排期|考勤/;
   const files = walk(path.join(root, 'src'));
   for (let i = 0; i < files.length; i += 1) {

@@ -17,7 +17,7 @@ import { applyPlate, clearedCount, isUnlocked, parseSave, serializeSave } from '
 import type { SaveState } from './meta/save';
 import { acceptOrder, createOrder, tickOrder } from './order/ticket';
 import type { OrderState } from './order/ticket';
-import type { Platform } from './platform/types';
+import type { Offscreen, Platform } from './platform/types';
 import { createPrep, tapPrep, tickPrep } from './prep/board';
 import type { PrepState } from './prep/board';
 import { compose } from './ui/compose';
@@ -53,6 +53,7 @@ class Game {
   private teach = '';
   private justCleared = false;
   private journalPath: string | null = null;
+  private journalWait: Promise<void> = Promise.resolve();
   private qa = false;
   private sealTaps = 0;
   private sealWindow = 0;
@@ -122,14 +123,20 @@ class Game {
     };
   }
 
-  private sensorTeach(): string {
-    if (this.teach) return this.teach;
-    if (this.screen !== 'cook') return '';
+  private sensorLine(): string {
     if (this.platform.isDevtools) return COPY.sensorDevtools;
     if (this.sensorPhase === 'deaf') return COPY.sensorDeaf;
     if (this.sensorPhase === 'fallback') return COPY.sensorFallback;
     if (this.sensorPhase === 'live') return COPY.sensorLive;
     return COPY.sensorPending;
+  }
+
+  private sensorTeach(): string {
+    if (this.screen === 'cook') {
+      const sensor = this.sensorLine();
+      return this.teach ? `${this.teach}${sensor}` : sensor;
+    }
+    return this.teach;
   }
 
   private onPointer(x: number, y: number): void {
@@ -166,7 +173,7 @@ class Game {
     this.prep = null;
     this.cook = null;
     this.plate = null;
-    this.teach = '';
+    this.teach = this.save.tutorialDone ? '' : COPY.teachOrder;
     this.screen = go('home', 'pick');
   }
 
@@ -175,6 +182,7 @@ class Game {
     this.order = acceptOrder(this.order);
     if (this.order.status !== 'accepted') return;
     this.prep = createPrep(this.dish, ENFORCE, SHOW_DECOYS);
+    if (!this.save.tutorialDone) this.teach = COPY.teachPrep;
     this.screen = go('order', 'accept');
   }
 
@@ -188,6 +196,7 @@ class Game {
     if (!this.dish) return;
     this.prepWrong = this.prep ? this.prep.wrong : 0;
     this.cook = createCook(this.dish, this.burnScale);
+    if (!this.save.tutorialDone) this.teach = COPY.teachCook;
     this.screen = go('prep', 'ready');
     this.beginSensors();
   }
@@ -242,7 +251,10 @@ class Game {
       { dishId: this.dish.id, score, rating, at: this.platform.now() },
       this.platform.now(),
     );
-    this.save = applied.save;
+    let next = applied.save;
+    if (!next.tutorialDone) next = Object.assign({}, next, { tutorialDone: true });
+    this.save = next;
+    this.teach = '';
     this.platform.storageSet(KEY_SAVE, serializeSave(this.save));
     const note = rating === 'wreck' ? reason : applied.kept ? COPY.kept : COPY.skipped;
     this.justCleared = isPassing(rating) && clearedCount(this.save, DISHES) >= SERVICE_COUNT && !applied.save.clearSeen;
@@ -254,28 +266,38 @@ class Game {
 
   private captureJournal(): void {
     if (!this.plate) return;
-    const board = this.platform.createOffscreen(JOURNAL_W, JOURNAL_H);
-    if (!board) {
+    let board: Offscreen | null = null;
+    try {
+      board = this.platform.createOffscreen(JOURNAL_W, JOURNAL_H);
+      if (!board) {
+        this.journalPath = null;
+        this.journalWait = Promise.resolve();
+        return;
+      }
+      const plate = this.plate;
+      paintJournal(board.ctx, {
+        dish: plate.dish.name,
+        region: plate.dish.region,
+        rating: plate.rating,
+        quip: plate.dish.quips[plate.rating],
+        science: plate.dish.science,
+        score: plate.score,
+      });
+    } catch (err) {
+      console.warn('[颠勺] 手账没画成', err);
       this.journalPath = null;
+      this.journalWait = Promise.resolve();
       return;
     }
-    const plate = this.plate;
-    paintJournal(board.ctx, {
-      dish: plate.dish.name,
-      region: plate.dish.region,
-      rating: plate.rating,
-      quip: plate.dish.quips[plate.rating],
-      science: plate.dish.science,
-      score: plate.score,
-    });
     this.journalPath = null;
-    void board.capture().then((path) => {
+    this.journalWait = board.capture().then((path) => {
       if (path) this.journalPath = path;
     });
   }
 
   private async shareJournal(): Promise<void> {
     if (!this.plate) return;
+    await this.journalWait;
     const status = await this.platform.share({
       title: `${this.plate.dish.name} · ${this.plate.score}分`,
       imageUrl: this.journalPath || undefined,
@@ -285,6 +307,7 @@ class Game {
   }
 
   private async saveJournal(): Promise<void> {
+    await this.journalWait;
     if (!this.journalPath) {
       this.teach = COPY.saveFail;
       return;
