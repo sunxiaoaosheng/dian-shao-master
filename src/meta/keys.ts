@@ -1,3 +1,2 @@
-export const KEY_DAILY = 'dianshao.daily.v1';
-export const KEY_ALBUM = 'dianshao.album.v1';
-export const KEY_META = 'dianshao.meta.v1';
+/** 点单炒菜馆的存档。旧的每日锅数键不再读。 */
+export const KEY_SAVE = 'dianshao.restaurant.v1';

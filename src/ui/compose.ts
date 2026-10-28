@@ -1,39 +1,29 @@
-import { RECIPES, levelShort } from '../content/recipes';
-import {
-  COPY,
-  HEAT_NAME,
-  TIER_NAME,
-  againLabel,
-  burnWarnLine,
-  cardBody,
-  chargesLabel,
-  cooldownLabel,
-  goalProgressLine,
-  playsLeftLabel,
-  restartLine,
-  roundRecap,
-  scoreLabel,
-  tossedLabel,
-  tossFeelLine,
-} from '../content/copy';
-import { cookRatio } from '../core/burn';
-import type { Session } from '../core/session';
-import { overflowRatio } from '../core/session';
-import type { Recipe } from '../content/recipes';
-import type { SensitivityTier } from '../input/gyro';
-import type { HitRect } from '../input/pointer';
-import type { AlbumState } from '../meta/cards';
-import type { FailReason } from '../core/types';
-import type { HeatId } from '../meta/difficulty';
-import type { BoardEntry } from '../meta/leaderboard';
-import { burnWarnKind, goalProgress } from '../meta/runGoal';
-import type { AlbumCardVM, ButtonVM, ScreenId, ViewModel } from './types';
+import { COPY, clearLine, clockLabel, ratingLabel, todayLine, windowLine } from '../content/copy';
+import type { Dish } from '../content/dishes';
+import { ratingFor } from '../cook/score';
+import type { Rating } from '../cook/score';
+import type { ScreenId } from '../flow/scenes';
+import type { SaveState } from '../meta/save';
+import { clearedCount, isUnlocked, showcaseOf } from '../meta/save';
+import { DISHES, SERVICE_COUNT } from '../content/dishes';
+import type { OrderState } from '../order/ticket';
+import type { PrepState } from '../prep/board';
+import type { ButtonVM, ChipVM, ViewModel } from './types';
 
-export interface ToastState {
-  text: string;
-  seed: number;
-  born: number;
-  until: number;
+export interface StubCook {
+  even: number;
+  burn: number;
+  leftMs: number;
+  totalMs: number;
+  hint: string;
+}
+
+export interface PlateView {
+  dish: Dish;
+  score: number;
+  rating: Rating;
+  kept: boolean;
+  reason: string;
 }
 
 export interface ComposeInput {
@@ -42,340 +32,176 @@ export interface ComposeInput {
   height: number;
   safeTop: number;
   safeBottom: number;
-  now: number;
-  playsLeft: number;
-  /** 测试号或开发者工具：日限用完也能开炒，并显示重置锅数。 */
-  practiceStart: boolean;
-  playsHint: string;
-  /** 今天还能靠自愿分享加的锅。用完且免费锅也没了，结算就指回灶台。 */
-  shareLeft: number;
-  /** 这一口还没写进出师次数。出师与否看本局合成、时间和招牌。 */
-  runsCompleted: number;
-  tier: SensitivityTier;
-  heatId: HeatId;
-  recipe: Recipe | null;
-  session: Session | null;
-  album: AlbumState;
-  board: BoardEntry[];
-  goalText: string;
-  adsOn: boolean;
-  toasts: ToastState[];
-  showTossButton: boolean;
-  sensorLabel: string;
-  motionNeedsSetting: boolean;
-  result: {
-    reason: FailReason;
-    score: number;
-    cardName: string | null;
-    seconds: number;
-    merges: number;
-    tosses: number;
-    quip: string;
-    graduated: boolean;
-    nextHeatId: HeatId;
-  } | null;
-  /** 颠勺手感冷却还剩的毫秒。0 表示这下可以颠。 */
-  tossWaitMs: number;
-  /** 传感器认出的次数。画面上的「已颠」取它和局里次数里更大的那个。 */
-  gyroHits: number;
-  shake: number;
-  canSave: boolean;
-  qa: { detected: number; impulse: number; angle: number; unit: string; phase: string } | null;
+  save: SaveState;
+  catalog: readonly Dish[];
+  order: OrderState | null;
+  prep: PrepState | null;
+  cook: StubCook | null;
+  plate: PlateView | null;
+  teach: string;
+  debugLines: string[];
 }
 
-const TIERS: SensitivityTier[] = ['gentle', 'standard', 'fierce'];
-
-export function composeView(input: ComposeInput): ViewModel {
+export function compose(input: ComposeInput): ViewModel {
   const vm: ViewModel = {
     width: input.width,
     height: input.height,
-    now: input.now,
-    shake: input.shake,
     screen: input.screen,
     title: COPY.title,
     subtitle: COPY.subtitle,
-    playsLabel: playsLeftLabel(input.playsLeft),
-    playsHint: input.playsHint,
-    heatLabel: HEAT_NAME[input.heatId],
-    goalText: input.goalText,
-    feelText: tossFeelLine(input.tier),
-    sensorLabel: input.sensorLabel,
-    motionNeedsSetting: input.motionNeedsSetting,
+    lines: [],
+    hint: input.teach,
+    even: null,
+    burn: null,
     buttons: [],
+    chips: [],
     hits: [],
-    toasts: liveToasts(input),
-    toastY: input.height * 0.62,
-    board: input.board.slice(0, 4).map((row) => ({
-      region: row.region,
-      line: `${row.chef} · ${row.dish}`,
-    })),
-    boardTitle: COPY.boardTitle,
-    boardNote: input.board.length ? '' : COPY.boardOff,
-    showBoard: false,
-    boardTop: 0,
-    seal: null,
-    play: null,
-    result: null,
-    album: null,
-    albumTitle: COPY.albumTitle,
-    qaLines: input.qa
-      ? [
-          `识别 ${input.qa.detected}`,
-          `冲量 ${input.qa.impulse.toFixed(2)}  转角 ${input.qa.angle.toFixed(0)}°`,
-          `${input.qa.unit} · ${input.qa.phase}`,
-        ]
-      : [],
+    debugLines: input.debugLines,
   };
-
   if (input.screen === 'home') layoutHome(input, vm);
-  else if (input.screen === 'play') layoutPlay(input, vm);
-  else if (input.screen === 'result') layoutResult(input, vm);
+  else if (input.screen === 'order') layoutOrder(input, vm);
+  else if (input.screen === 'prep') layoutPrep(input, vm);
+  else if (input.screen === 'cook') layoutCook(input, vm);
+  else if (input.screen === 'plate') layoutPlate(input, vm);
+  else if (input.screen === 'clear') layoutClear(input, vm);
   else layoutAlbum(input, vm);
-
   for (let i = 0; i < vm.buttons.length; i += 1) {
     const button = vm.buttons[i];
     vm.hits.push({ id: button.id, x: button.x, y: button.y, w: button.w, h: button.h });
   }
-  if (vm.seal) vm.hits.push(vm.seal);
+  for (let i = 0; i < vm.chips.length; i += 1) {
+    const chip = vm.chips[i];
+    vm.hits.push({ id: chip.id, x: chip.x, y: chip.y, w: chip.w, h: chip.h });
+  }
+  vm.hits.push({ id: 'seal', x: input.width - 72, y: input.safeTop + 12, w: 54, h: 54 });
   return vm;
 }
 
 function layoutHome(input: ComposeInput, vm: ViewModel): void {
-  const pad = 18;
-  const bw = input.width - pad * 2;
-  vm.seal = { id: 'seal', x: input.width - 72, y: input.safeTop + 16, w: 54, h: 54 };
-  let y = input.safeTop + 176;
-  const tw = (bw - 16) / 3;
-  for (let i = 0; i < TIERS.length; i += 1) {
-    const tier = TIERS[i];
-    vm.buttons.push(button(`tier:${tier}`, TIER_NAME[tier], pad + i * (tw + 8), y, tw, 36, false, false, tier === input.tier));
-  }
-  y += 78;
-  const stack = [
-    { id: 'start', label: COPY.start, primary: true, disabled: !input.practiceStart && input.playsLeft <= 0 },
-    { id: 'share', label: COPY.shareHome, primary: false, disabled: false },
-    { id: 'album', label: COPY.album, primary: false, disabled: false },
+  const done = clearedCount(input.save, input.catalog);
+  const show = showcaseOf(input.save);
+  const showDish = show ? dishName(input.catalog, show.dishId) : '';
+  vm.lines = [
+    clearLine(done, SERVICE_COUNT),
+    todayLine(input.save.today.score, dishName(input.catalog, input.save.today.dishId)),
+    windowLine(show ? show.rating : null, showDish, show ? show.score : 0),
   ];
-  if (input.practiceStart) {
-    stack.push({ id: 'resetDaily', label: COPY.resetDaily, primary: false, disabled: false });
-  }
-  if (input.adsOn) stack.push({ id: 'ad', label: COPY.adButton, primary: false, disabled: false });
-  for (let i = 0; i < stack.length; i += 1) {
-    const item = stack[i];
-    vm.buttons.push(button(item.id, item.label, pad, y, bw, 46, item.primary, item.disabled, false));
-    y += 54;
-  }
-  vm.toastY = Math.min(input.height * 0.72, y);
-  if (y < input.height - input.safeBottom - 120) {
-    vm.showBoard = true;
-    vm.boardTop = y + 6;
-  }
-}
-
-function layoutPlay(input: ComposeInput, vm: ViewModel): void {
-  const session = input.session;
-  const recipe = input.recipe;
-  if (!session || !recipe) return;
-  const top = input.safeTop + 8;
-  const bottom = 156 + input.safeBottom;
-  const gap = 6;
-  const availW = input.width - 28;
-  const availH = input.height - bottom - (top + 86);
-  let cell = Math.floor(Math.min(
-    (availW - gap * (session.cols - 1)) / session.cols,
-    (availH - gap * (session.rows - 1)) / session.rows,
-  ));
-  if (cell > 86) cell = 86;
-  if (cell < 40) cell = 40;
-  const gridW = cell * session.cols + gap * (session.cols - 1);
-  const gridH = cell * session.rows + gap * (session.rows - 1);
-  const gx = (input.width - gridW) / 2;
-  const gy = top + 86 + Math.max(0, (availH - gridH) / 2);
-  const cells = [];
-  for (let i = 0; i < session.cells.length; i += 1) {
-    const piece = session.cells[i];
-    const col = i % session.cols;
-    const row = (i / session.cols) | 0;
-    const x = gx + col * (cell + gap);
-    const y = gy + row * (cell + gap);
-    const hit: HitRect = { id: `cell:${i}`, x, y, w: cell, h: cell };
-    vm.hits.push(hit);
-    cells.push({
-      hitId: hit.id,
-      x,
-      y,
-      w: cell,
-      h: cell,
-      name: piece.level > 0 ? levelShort(recipe, piece.level) : '',
-      level: piece.level,
-      burnt: piece.burnt,
-      cook: cookRatio(piece, session.baseBurnMs, session.burnPerLevelMs),
-      seed: piece.id || i + 1,
-      ink: recipe.ink,
-    });
-  }
-  const overflow = overflowRatio(session);
-  vm.play = {
-    recipeName: recipe.name,
-    region: recipe.region,
-    scoreText: scoreLabel(session.score),
-    meter: session.meter / 100,
-    chargesText: chargesLabel(session.charges),
-    charges: session.charges,
-    maxCharges: session.maxCharges,
-    tossedText: tossedLabel(Math.max(session.tossCount, input.gyroHits)),
-    cooldownText: input.tossWaitMs > 0 ? cooldownLabel(TIER_NAME[input.tier], input.tossWaitMs) : '',
-    showPerfect: session.cardsThisRun > 0,
-    showBurnt: session.meter >= 85,
-    cells,
-    nextName: levelShort(recipe, session.nextLevel),
-    nextLevel: session.nextLevel,
-    nextInk: recipe.ink,
-    showTossButton: input.showTossButton,
-    overflowText: overflow === null ? '' : COPY.overflow,
-    hint: session.hint && session.merges === 0 ? COPY.hint : '',
-    mergeRule: COPY.hint,
-    goalText: goalProgressLine(goalProgress({
-      runsCompleted: input.runsCompleted,
-      heatId: session.heatId,
-      merges: session.merges,
-      elapsedMs: session.elapsedMs,
-      cards: session.cardsThisRun,
-    })),
-    warnText: burnWarnLine(burnWarnKind(session.meter, hottestCook(session))),
-    feelText: tossFeelLine(input.tier),
-    wok: { x: gx - 18, y: gy - 8, w: gridW + 36, h: gridH + 22 },
-    nextBox: { x: 16, y: input.height - input.safeBottom - 92, w: 68, h: 76 },
-  };
-  const tossY = input.height - input.safeBottom - 70;
-  if (input.motionNeedsSetting) {
-    vm.buttons.push(button('retryListen', COPY.retryListen, 96, tossY - 44, 108, 34, true, false, false));
-  }
-  if (input.showTossButton) {
-    const cooling = input.tossWaitMs > 0;
-    const spent = session.charges <= 0 && !input.practiceStart;
+  let y = input.safeTop + 168;
+  const catalog = input.catalog.length ? input.catalog : DISHES;
+  for (let i = 0; i < catalog.length; i += 1) {
+    const dish = catalog[i];
+    const open = isUnlocked(input.save, dish, catalog);
     vm.buttons.push(button(
-      'toss',
-      COPY.toss,
-      input.width - 156,
-      tossY,
-      140,
-      46,
-      true,
-      cooling || spent,
-      false,
+      `dish:${dish.id}`,
+      open ? dish.name : `${dish.name} · 未开`,
+      18,
+      y,
+      input.width - 36,
+      48,
+      open,
+      !open,
     ));
+    y += 58;
   }
-  vm.toastY = gy + gridH * 0.42;
+  vm.buttons.push(button('album', COPY.album, 18, y, input.width - 36, 44, false, false));
 }
 
-function layoutResult(input: ComposeInput, vm: ViewModel): void {
-  const result = input.result;
-  const card = result && result.cardName ? cardBody(result.cardName) : COPY.noCardBody;
-  const reason = result && result.reason === 'grid_full' ? COPY.fullFailTitle : COPY.burnFailTitle;
-  const detail = result && result.reason === 'grid_full' ? COPY.fullFailBody : COPY.burnFailBody;
-  const quip = result && result.quip ? result.quip : '';
-  vm.result = {
-    title: reason,
-    body: `${detail}${quip}${card}`,
-    scoreText: scoreLabel(result ? result.score : 0),
-    recap: result ? roundRecap(result.seconds, result.merges, result.tosses) : '',
-    nextLine: result
-      ? restartLine(input.playsLeft, result.graduated, HEAT_NAME[result.nextHeatId], input.shareLeft)
-      : '',
-  };
-  const pad = 18;
-  const bw = input.width - pad * 2;
-  let y = input.safeTop + 258;
-  const stack: { id: string; label: string; primary: boolean }[] = [];
-  if (result && (input.playsLeft > 0 || input.practiceStart)) {
-    stack.push({ id: 'again', label: againLabel(result.graduated, HEAT_NAME[result.nextHeatId]), primary: true });
+function layoutOrder(input: ComposeInput, vm: ViewModel): void {
+  const order = input.order;
+  vm.title = order ? order.dishName : COPY.title;
+  vm.subtitle = order ? order.region : '';
+  vm.lines = order ? [order.line, clockLabel(order.leftMs)] : [];
+  vm.hint = input.teach || COPY.orderHint;
+  const y = input.safeTop + 220;
+  vm.buttons.push(button('accept', COPY.accept, 18, y, input.width - 36, 48, true, false));
+  vm.buttons.push(button('home', COPY.back, 18, y + 60, input.width - 36, 44, false, false));
+}
+
+function layoutPrep(input: ComposeInput, vm: ViewModel): void {
+  const prep = input.prep;
+  vm.title = '砧板';
+  vm.subtitle = prep ? clockLabel(prep.leftMs) : '';
+  vm.lines = prep ? [`点错 ${prep.wrong}/${prep.maxWrong}`] : [];
+  vm.hint = input.teach || COPY.prepHint;
+  const pieces = prep ? prep.pieces : [];
+  const colW = (input.width - 36 - 16) / 2;
+  for (let i = 0; i < pieces.length; i += 1) {
+    const piece = pieces[i];
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const chip: ChipVM = {
+      id: `ing:${piece.id}`,
+      label: piece.name,
+      ink: piece.ink,
+      x: 18 + col * (colW + 16),
+      y: input.safeTop + 180 + row * 78,
+      w: colW,
+      h: 66,
+      got: piece.got,
+      bad: piece.role !== 'need',
+    };
+    vm.chips.push(chip);
   }
-  if (input.canSave) stack.push({ id: 'save', label: COPY.saveClip, primary: false });
-  stack.push({ id: 'share', label: COPY.shareButton, primary: false });
-  if (input.adsOn) stack.push({ id: 'ad', label: COPY.adButton, primary: false });
-  stack.push({ id: 'home', label: COPY.back, primary: false });
-  for (let i = 0; i < stack.length; i += 1) {
-    const item = stack[i];
-    vm.buttons.push(button(item.id, item.label, pad, y, bw, 44, item.primary, false, false));
-    y += 52;
+  vm.buttons.push(button('home', COPY.back, 18, input.height - input.safeBottom - 64, input.width - 36, 44, false, false));
+}
+
+function layoutCook(input: ComposeInput, vm: ViewModel): void {
+  const cook = input.cook;
+  vm.title = '颠勺';
+  vm.subtitle = cook ? clockLabel(cook.leftMs) : '';
+  vm.even = cook ? cook.even / 100 : 0;
+  vm.burn = cook ? cook.burn / 100 : 0;
+  vm.hint = input.teach || (cook ? cook.hint : COPY.cookHint);
+  vm.lines = cook ? [`这下大约 ${ratingLabel(ratingFor(cook.even))}`] : [];
+  const y = input.height - input.safeBottom - 120;
+  vm.buttons.push(button('toss', COPY.toss, 18, y, input.width - 36, 48, true, false));
+  vm.buttons.push(button('plate', COPY.plate, 18, y + 58, input.width - 36, 44, false, false));
+}
+
+function layoutPlate(input: ComposeInput, vm: ViewModel): void {
+  const plate = input.plate;
+  vm.title = plate ? ratingLabel(plate.rating) : '';
+  vm.subtitle = plate ? plate.dish.name : '';
+  vm.lines = plate
+    ? [`${plate.score} 分`, plate.dish.quips[plate.rating], plate.dish.science, plate.reason]
+    : [];
+  let y = input.safeTop + 250;
+  if (plate && plate.rating === 'wreck') {
+    vm.buttons.push(button('retry', COPY.retry, 18, y, input.width - 36, 48, true, false));
+    y += 58;
   }
-  vm.toastY = input.safeTop + 168;
+  vm.buttons.push(button('home', COPY.next, 18, y, input.width - 36, 46, plate ? plate.rating !== 'wreck' : true, false));
+  vm.buttons.push(button('album', COPY.album, 18, y + 56, input.width - 36, 44, false, false));
 }
 
 function layoutAlbum(input: ComposeInput, vm: ViewModel): void {
-  const owned = new Set<string>();
-  for (let i = 0; i < input.album.cards.length; i += 1) owned.add(input.album.cards[i].recipeId);
-  const pad = 16;
-  const gap = 10;
-  const cols = 2;
-  const rows = Math.ceil(RECIPES.length / cols);
-  const cardW = (input.width - pad * 2 - gap) / cols;
-  const available = input.height - input.safeTop - input.safeBottom - 78 - 74;
-  const cardH = Math.max(92, Math.min(150, (available - gap * (rows - 1)) / rows));
-  const cards: AlbumCardVM[] = [];
-  for (let i = 0; i < RECIPES.length; i += 1) {
-    const recipe = RECIPES[i];
-    const col = i % cols;
-    const row = (i / cols) | 0;
-    const has = owned.has(recipe.id);
-    cards.push({
-      name: has ? recipe.name : COPY.albumEmpty,
-      region: recipe.region,
-      blurb: has ? recipe.blurb : '',
-      owned: has,
-      ink: recipe.ink,
-      x: pad + col * (cardW + gap),
-      y: input.safeTop + 78 + row * (cardH + gap),
-      w: cardW,
-      h: cardH,
-      level: recipe.levels.length,
-    });
+  vm.title = COPY.album;
+  vm.subtitle = COPY.subtitle;
+  const lines: string[] = [];
+  for (let i = 0; i < input.catalog.length; i += 1) {
+    const dish = input.catalog[i];
+    lines.push(dish.name);
+    lines.push(dish.science);
+    lines.push(dish.album);
   }
-  vm.album = cards;
-  vm.buttons.push(button(
-    'home',
-    COPY.back,
-    18,
-    input.height - input.safeBottom - 62,
-    input.width - 36,
-    46,
-    true,
-    false,
-    false,
-  ));
+  vm.lines = lines;
+  vm.buttons.push(button('home', COPY.back, 18, input.height - input.safeBottom - 64, input.width - 36, 44, true, false));
 }
 
-function hottestCook(session: Session): number {
-  let hottest = 0;
-  for (let i = 0; i < session.cells.length; i += 1) {
-    const ratio = cookRatio(session.cells[i], session.baseBurnMs, session.burnPerLevelMs);
-    if (ratio > hottest) hottest = ratio;
-  }
-  return hottest;
+function layoutClear(input: ComposeInput, vm: ViewModel): void {
+  vm.title = COPY.clearTitle;
+  vm.subtitle = COPY.subtitle;
+  vm.lines = [COPY.clearBody, clearLine(clearedCount(input.save, input.catalog), input.catalog.length)];
+  vm.buttons.push(button('home', COPY.back, 18, input.safeTop + 240, input.width - 36, 48, true, false));
 }
 
-function button(
-  id: string,
-  label: string,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  primary: boolean,
-  disabled: boolean,
-  selected: boolean,
-): ButtonVM {
-  return { id, label, x, y, w, h, primary, disabled, selected };
+function button(id: string, label: string, x: number, y: number, w: number, h: number, primary: boolean, disabled: boolean): ButtonVM {
+  return { id, label, x, y, w, h, primary, disabled };
 }
 
-function liveToasts(input: ComposeInput): { text: string; seed: number; life: number }[] {
-  const out = [];
-  for (let i = 0; i < input.toasts.length; i += 1) {
-    const toast = input.toasts[i];
-    if (toast.until <= input.now) continue;
-    const span = Math.max(1, toast.until - toast.born);
-    out.push({ text: toast.text, seed: toast.seed, life: (toast.until - input.now) / span });
+function dishName(catalog: readonly Dish[], id: string): string {
+  for (let i = 0; i < catalog.length; i += 1) {
+    if (catalog[i].id === id) return catalog[i].name;
   }
-  return out;
+  return '';
 }

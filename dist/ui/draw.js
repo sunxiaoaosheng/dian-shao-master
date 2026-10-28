@@ -12,11 +12,20 @@ exports.drawPolaroid = drawPolaroid;
 exports.drawButton = drawButton;
 exports.drawMeter = drawMeter;
 exports.drawWrapped = drawWrapped;
-const rng_1 = require("../core/rng");
 const theme_1 = require("./theme");
 const tornCache = new Map();
 let speckKey = '';
 let specks = [];
+function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+        a |= 0;
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
 function hashSeed(text) {
     let h = 2166136261;
     for (let i = 0; i < text.length; i += 1) {
@@ -42,7 +51,7 @@ function paintPaper(ctx, w, h) {
     const key = `${Math.round(w)}x${Math.round(h)}`;
     if (key !== speckKey) {
         speckKey = key;
-        const rand = (0, rng_1.mulberry32)(w * 13 + h);
+        const rand = mulberry32(w * 13 + h);
         specks = [];
         const count = Math.max(40, Math.floor((w * h) / 14000));
         for (let i = 0; i < count; i += 1) {
@@ -307,7 +316,7 @@ function tornPolygon(w, h, seed, amp) {
     const cached = tornCache.get(key);
     if (cached)
         return cached;
-    const rand = (0, rng_1.mulberry32)(seed || 1);
+    const rand = mulberry32(seed || 1);
     const pts = [];
     const steps = 6;
     const edge = (x0, y0, x1, y1) => {

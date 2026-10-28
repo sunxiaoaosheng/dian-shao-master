@@ -2,158 +2,96 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startGame = startGame;
 const copy_1 = require("./content/copy");
-const toasts_1 = require("./content/toasts");
-const recipes_1 = require("./content/recipes");
-const session_1 = require("./core/session");
-const gyro_1 = require("./input/gyro");
+const dishes_1 = require("./content/dishes");
+const score_1 = require("./cook/score");
+const scenes_1 = require("./flow/scenes");
 const pointer_1 = require("./input/pointer");
-const sensors_1 = require("./input/sensors");
 const loop_1 = require("./loop");
-const ads_1 = require("./meta/ads");
-const cards_1 = require("./meta/cards");
-const daily_1 = require("./meta/daily");
-const difficulty_1 = require("./meta/difficulty");
 const keys_1 = require("./meta/keys");
-const leaderboard_1 = require("./meta/leaderboard");
-const progress_1 = require("./meta/progress");
-const share_1 = require("./meta/share");
+const save_1 = require("./meta/save");
+const ticket_1 = require("./order/ticket");
+const board_1 = require("./prep/board");
 const compose_1 = require("./ui/compose");
 const paint_1 = require("./ui/paint");
 const sprites_1 = require("./ui/sprites");
-const clip_1 = require("./viral/clip");
-const moment_1 = require("./viral/moment");
-const shareCard_1 = require("./viral/shareCard");
+/** v1 先把流程走通。v3 再打开限时和错料。 */
+const ENFORCE = false;
+const SHOW_DECOYS = false;
 function startGame(platform) {
-    const app = new GameApp(platform);
+    const app = new Game(platform);
     (0, loop_1.runLoop)((dt) => {
         app.tick(dt);
         app.draw();
     }, () => platform.now());
 }
-class GameApp {
+class Game {
     constructor(platform) {
-        this.mux = new sensors_1.SensorMux();
         this.screen = 'home';
-        this.session = null;
-        this.recipe = null;
-        this.toasts = [];
-        this.lastView = null;
-        this.sensorPhase = 'pending';
-        this.sensorGen = 0;
-        this.sensorWaitUntil = 0;
-        this.tossReadyAt = 0;
-        this.shake = 0;
-        this.gyroHits = 0;
-        this.gyroStreak = 0;
-        this.lastGyroAt = 0;
-        this.samplesSeen = 0;
-        this.qaMode = false;
+        this.dish = null;
+        this.order = null;
+        this.prep = null;
+        this.cook = null;
+        this.plate = null;
+        this.teach = '';
+        this.qa = false;
         this.sealTaps = 0;
         this.sealWindow = 0;
-        this.ended = false;
-        this.announcedSensor = false;
-        this.toldFallback = false;
-        this.toldNoCharge = false;
-        this.loggedLive = false;
-        this.lastMoment = null;
-        this.lastClipPath = null;
-        this.result = null;
-        this.board = [];
+        this.lastView = null;
         this.platform = platform;
-        this.practice = (0, daily_1.usesTestPotQuota)(platform.appId(), platform.isDevtools);
-        const today = (0, daily_1.formatDay)(platform.now());
-        this.daily = (0, daily_1.rollDaily)((0, daily_1.parseDaily)(platform.storageGet(keys_1.KEY_DAILY)), today);
-        this.album = (0, cards_1.parseAlbum)(platform.storageGet(keys_1.KEY_ALBUM));
-        this.meta = (0, progress_1.parseMeta)(platform.storageGet(keys_1.KEY_META));
-        this.detector = (0, gyro_1.createTossDetector)(this.meta.tier);
-        this.ad = (0, ads_1.createRewardedAd)({
-            enabled: ads_1.ADS_ENABLED,
-            adUnitId: ads_1.REWARDED_AD_UNIT_ID,
-            create: () => platform.createRewardedVideoAd(ads_1.REWARDED_AD_UNIT_ID),
-        });
-        this.refreshBoard();
+        this.save = (0, save_1.parseSave)(platform.storageGet(keys_1.KEY_SAVE), platform.now());
         if (platform.launchQuery().qa === '1')
-            this.qaMode = true;
+            this.qa = true;
         platform.onPointer((point) => this.onPointer(point.x, point.y));
-        platform.onShow(() => {
-            this.refreshDate();
-            this.refreshBoard();
-            if (this.screen === 'play')
-                this.beginSensors();
-        });
-        platform.onHide(() => {
-            if (this.screen === 'play')
-                this.platform.stopSensors();
-        });
-        platform.setMotionHandler((res) => {
-            if (this.screen !== 'play' || !this.session)
-                return;
-            this.feed(this.mux.motion(res, this.platform.now()));
-        });
-        platform.setAccelHandler((res) => {
-            if (this.screen !== 'play' || !this.session)
-                return;
-            this.feed(this.mux.accel(res, this.platform.now()));
-        });
         platform.setMenuShare({ title: copy_1.COPY.menuShare, query: 'from=menu' });
         (0, sprites_1.loadCollage)(() => platform.createImage());
     }
     tick(dt) {
-        this.refreshDate();
-        if (this.shake > 0)
-            this.shake *= Math.exp(-dt / 160);
-        if (this.screen === 'play' && this.session) {
-            this.consumeEvents((0, session_1.tick)(this.session, dt));
-            this.watchSensor();
+        if (this.screen === 'order' && this.order)
+            this.order = (0, ticket_1.tickOrder)(this.order, dt);
+        if (this.screen === 'prep' && this.prep)
+            this.prep = (0, board_1.tickPrep)(this.prep, dt);
+        if (this.screen === 'cook' && this.cook && this.cook.leftMs > 0) {
+            const left = Math.max(0, this.cook.leftMs - dt);
+            const elapsed = this.cook.totalMs - left;
+            const hint = this.dish ? (0, dishes_1.phaseAt)(this.dish, elapsed / this.cook.totalMs).hint : this.cook.hint;
+            this.cook = Object.assign({}, this.cook, { leftMs: left, hint });
+            if (left <= 0)
+                this.finishCook();
         }
+        this.advance();
     }
     draw() {
-        const vm = (0, compose_1.composeView)(this.snapshot());
+        const vm = (0, compose_1.compose)(this.snapshot());
         this.lastView = vm;
         (0, paint_1.paint)(this.platform.ctx, vm);
     }
     snapshot() {
-        const peek = this.detector.peek();
-        const upcoming = this.heatProfile();
         return {
             screen: this.screen,
             width: this.platform.width,
             height: this.platform.height,
             safeTop: this.platform.safeTop,
             safeBottom: this.platform.safeBottom,
-            now: this.platform.now(),
-            playsLeft: (0, daily_1.playsRemaining)(this.daily, this.potQuota()),
-            practiceStart: this.practice,
-            playsHint: this.practice ? (0, copy_1.testPlaysHint)() : copy_1.COPY.playsHint,
-            shareLeft: (0, daily_1.shareSlotsLeft)(this.daily),
-            runsCompleted: this.meta.runsCompleted,
-            tier: this.meta.tier,
-            heatId: this.session && this.screen !== 'home' ? this.session.heatId : upcoming.id,
-            goalText: (0, copy_1.heatGoal)(upcoming.id, upcoming.cols, upcoming.rows, upcoming.tossCharges),
-            adsOn: this.ad.isConfigured(),
-            recipe: this.recipe,
-            session: this.session,
-            album: this.album,
-            board: this.board,
-            toasts: this.toasts,
-            showTossButton: this.keepManualToss(),
-            sensorLabel: this.sensorLabel(),
-            motionNeedsSetting: !this.platform.isDevtools && (this.sensorPhase === 'deaf' || this.sensorPhase === 'fallback'),
-            gyroHits: this.gyroHits,
-            result: this.result,
-            tossWaitMs: Math.max(0, this.tossReadyAt - this.platform.now()),
-            shake: this.shake,
-            canSave: Boolean(this.lastClipPath),
-            qa: this.qaMode
-                ? {
-                    detected: this.gyroHits,
-                    impulse: peek.impulse,
-                    angle: peek.angle,
-                    unit: peek.unit,
-                    phase: this.sensorPhase,
-                }
-                : null,
+            save: this.save,
+            catalog: dishes_1.DISHES,
+            order: this.order,
+            prep: this.prep,
+            cook: this.cook,
+            plate: this.plate,
+            teach: this.teach,
+            debugLines: this.debugLines(),
         };
+    }
+    debugLines() {
+        if (!this.qa || !this.cook || !this.dish)
+            return [];
+        const elapsed = this.cook.totalMs - this.cook.leftMs;
+        const phase = (0, dishes_1.phaseAt)(this.dish, elapsed / this.cook.totalMs);
+        return [
+            `段 ${phase.want} 均匀/秒 ${phase.evenPerSec}`,
+            `糊边/秒 ${phase.burnPerSec} 闲置 ${phase.idleBurnPerSec}`,
+            `现在 ${Math.round(this.cook.even)} / ${Math.round(this.cook.burn)}`,
+        ];
     }
     onPointer(x, y) {
         if (!this.lastView)
@@ -165,396 +103,121 @@ class GameApp {
             this.onSeal();
             return;
         }
-        if (id.indexOf('tier:') === 0) {
-            this.setTier(id.slice(5));
+        const button = findButton(this.lastView, id);
+        if (button && button.disabled)
             return;
-        }
-        if (id.indexOf('cell:') === 0) {
-            this.onCell(Number(id.slice(5)));
-            return;
-        }
-        if (id === 'start' || id === 'again')
-            this.startRun();
-        else if (id === 'resetDaily')
-            this.resetTodayPots();
+        if (id.indexOf('dish:') === 0)
+            this.beginOrder(id.slice(5));
+        else if (id === 'accept')
+            this.accept();
+        else if (id.indexOf('ing:') === 0)
+            this.tapIngredient(id.slice(4));
+        else if (id === 'toss')
+            this.toss();
+        else if (id === 'plate')
+            this.finishCook();
+        else if (id === 'retry')
+            this.retry();
         else if (id === 'album')
-            this.screen = 'album';
+            this.screen = (0, scenes_1.go)(this.screen, 'album');
         else if (id === 'home')
             this.goHome();
-        else if (id === 'toss')
-            this.tryToss('button');
-        else if (id === 'retryListen')
-            this.retryListen();
-        else if (id === 'share')
-            void this.shareVoluntary();
-        else if (id === 'ad')
-            void this.watchAd();
-        else if (id === 'save')
-            void this.saveClip();
     }
-    potQuota() {
-        return (0, daily_1.freePlaysFor)(this.practice);
-    }
-    heatProfile() {
-        const picked = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
-        return this.practice ? (0, difficulty_1.practiceProfile)(picked) : picked;
-    }
-    resetTodayPots() {
-        this.refreshDate();
-        this.daily = (0, daily_1.resetToday)(this.daily);
-        this.saveDaily();
-        this.toast(copy_1.COPY.resetDailyOk);
-    }
-    startRun() {
-        this.refreshDate();
-        const quota = this.potQuota();
-        if ((0, daily_1.canStart)(this.daily, quota)) {
-            this.daily = (0, daily_1.consumePlay)(this.daily, quota);
-            this.saveDaily();
-        }
-        else if (this.practice) {
-            this.toast(copy_1.COPY.probeStart);
-        }
-        else {
-            this.toast(copy_1.COPY.noPlays);
+    beginOrder(id) {
+        const dish = findDish(id);
+        if (!dish || !(0, save_1.isUnlocked)(this.save, dish, dishes_1.DISHES))
             return;
-        }
-        const profile = this.heatProfile();
-        this.recipe = (0, recipes_1.recipeForRun)(this.meta.runsCompleted);
-        this.session = (0, session_1.createSession)({
-            recipeId: this.recipe.id,
-            maxLevel: this.recipe.levels.length,
-            profile,
-            seed: this.platform.now() >>> 0,
-        });
-        this.screen = 'play';
-        this.result = null;
-        this.ended = false;
-        this.toldFallback = false;
-        this.toldNoCharge = false;
-        this.tossReadyAt = 0;
-        this.lastMoment = null;
-        this.lastClipPath = null;
-        this.toast(profile.hint ? copy_1.COPY.hint : (0, copy_1.heatStart)(copy_1.HEAT_NAME[profile.id]));
-        this.beginSensors();
+        this.dish = dish;
+        this.order = (0, ticket_1.createOrder)(dish, ENFORCE);
+        this.prep = null;
+        this.cook = null;
+        this.plate = null;
+        this.teach = '';
+        this.screen = (0, scenes_1.go)('home', 'pick');
+    }
+    accept() {
+        if (!this.dish || !this.order || this.screen !== 'order')
+            return;
+        this.order = (0, ticket_1.acceptOrder)(this.order);
+        if (this.order.status !== 'accepted')
+            return;
+        this.prep = (0, board_1.createPrep)(this.dish, ENFORCE, SHOW_DECOYS);
+        this.screen = (0, scenes_1.go)('order', 'accept');
+    }
+    tapIngredient(id) {
+        if (!this.prep || this.screen !== 'prep')
+            return;
+        this.prep = (0, board_1.tapPrep)(this.prep, id);
+        this.advance();
+    }
+    beginCook() {
+        if (!this.dish)
+            return;
+        const total = Math.round(this.dish.cookSeconds * 1000 * this.dish.pace);
+        this.cook = {
+            even: 0,
+            burn: 0,
+            leftMs: total,
+            totalMs: total,
+            hint: this.dish.phases[0] ? this.dish.phases[0].hint : copy_1.COPY.cookHint,
+        };
+        this.screen = (0, scenes_1.go)('prep', 'ready');
+    }
+    toss() {
+        if (!this.cook || this.screen !== 'cook')
+            return;
+        this.cook = Object.assign({}, this.cook, { even: Math.min(100, this.cook.even + 22) });
+        this.platform.vibrate();
+    }
+    finishCook() {
+        if (!this.dish || !this.cook || this.screen !== 'cook')
+            return;
+        const score = (0, score_1.clampScore)(this.cook.even);
+        this.publish(score, (0, score_1.ratingFor)(score), score >= 60 ? '' : '这盘还没颠匀。');
+    }
+    fail(reason) {
+        this.cook = null;
+        this.publish(0, 'wreck', reason);
+    }
+    publish(score, rating, reason) {
+        if (!this.dish)
+            return;
+        const applied = (0, save_1.applyPlate)(this.save, { dishId: this.dish.id, score, rating, at: this.platform.now() }, this.platform.now());
+        this.save = applied.save;
+        this.platform.storageSet(keys_1.KEY_SAVE, (0, save_1.serializeSave)(this.save));
+        const note = rating === 'wreck' ? reason : applied.kept ? copy_1.COPY.kept : copy_1.COPY.skipped;
+        this.plate = { dish: this.dish, score, rating, kept: applied.kept, reason: note };
+        this.screen = 'plate';
+    }
+    retry() {
+        if (!this.dish)
+            return;
+        this.order = (0, ticket_1.createOrder)(this.dish, ENFORCE);
+        this.prep = null;
+        this.cook = null;
+        this.plate = null;
+        this.screen = (0, scenes_1.go)('plate', 'retry');
     }
     goHome() {
-        this.sensorGen += 1;
-        this.platform.stopSensors();
-        this.screen = 'home';
+        this.order = null;
+        this.prep = null;
+        this.cook = null;
+        this.plate = null;
+        this.teach = '';
+        this.screen = (0, scenes_1.go)(this.screen, 'home');
     }
-    onCell(index) {
-        if (!this.session || this.screen !== 'play' || !Number.isFinite(index))
-            return;
-        const result = (0, session_1.place)(this.session, index);
-        if (!result.ok)
-            return;
-        this.consumeEvents(result.events);
-    }
-    tryToss(source) {
-        if (!this.session || this.screen !== 'play')
-            return;
-        const now = this.platform.now();
-        if (!(0, gyro_1.canAcceptToss)(now, this.tossReadyAt)) {
-            if (source === 'button')
-                this.toast(copy_1.COPY.tossSoon);
+    advance() {
+        if (!this.prep || this.screen !== 'prep') {
+            if (this.order && this.screen === 'order' && this.order.status === 'timeout')
+                this.fail(copy_1.COPY.failTimeout);
             return;
         }
-        let result = (0, session_1.applyToss)(this.session);
-        if (!result.ok && result.reason === 'empty' && this.practice) {
-            this.session.charges = Math.max(this.session.maxCharges, 8);
-            result = (0, session_1.applyToss)(this.session);
-        }
-        if (!result.ok) {
-            if (result.reason === 'empty' && (source === 'button' || !this.toldNoCharge)) {
-                this.toldNoCharge = true;
-                this.toast(copy_1.COPY.noCharges);
-            }
-            return;
-        }
-        this.tossReadyAt = (0, gyro_1.nextReadyAt)(now, this.meta.tier);
-        this.shake = (0, gyro_1.tossFeel)(this.meta.tier).shake;
-        this.platform.vibrate();
-        this.toast((0, copy_1.tossAck)(this.meta.tier));
-        this.toast((0, toasts_1.pickToast)(now).text);
-        this.captureMoment(source === 'gyro' ? 1 : 0.65);
-        this.consumeEvents(result.events);
-    }
-    feed(sample) {
-        this.samplesSeen += 1;
-        const event = this.detector.push(sample);
-        if (this.detector.isLive() && !this.platform.isDevtools)
-            this.sensorPhase = 'live';
-        if (!this.loggedLive && this.detector.isLive()) {
-            this.loggedLive = true;
-            console.log('[颠勺] 传感器就绪', this.detector.peek().unit, '冷却ms', (0, gyro_1.cooldownMsFor)(this.meta.tier));
-        }
-        if (!event)
-            return;
-        const now = this.platform.now();
-        if (now - this.lastGyroAt > 2500)
-            this.gyroStreak = 0;
-        this.gyroStreak += 1;
-        this.gyroHits += 1;
-        this.lastGyroAt = now;
-        console.log('[颠勺] 识别', this.gyroHits);
-        this.tryToss('gyro');
-    }
-    /** 测试期真机保留手动颠勺，直到传感器连续认出 3 下。 */
-    keepManualToss() {
-        if (this.platform.isDevtools)
-            return true;
-        if (this.practice && this.gyroStreak < 3)
-            return true;
-        return this.sensorPhase !== 'live';
-    }
-    beginSensors() {
-        const gen = ++this.sensorGen;
-        this.platform.stopSensors();
-        this.mux.reset();
-        this.detector = (0, gyro_1.createTossDetector)(this.meta.tier);
-        this.gyroHits = 0;
-        this.gyroStreak = 0;
-        this.lastGyroAt = 0;
-        this.samplesSeen = 0;
-        this.loggedLive = false;
-        if (this.platform.isDevtools) {
-            this.sensorPhase = 'fallback';
-            if (!this.announcedSensor) {
-                this.announcedSensor = true;
-                this.toast(copy_1.COPY.sensorDevtools);
-            }
-            return;
-        }
-        this.sensorPhase = 'pending';
-        this.sensorWaitUntil = Number.POSITIVE_INFINITY;
-        void this.openSensors(gen);
-    }
-    /** 再听一次方向和加速度。不打开系统设置页。 */
-    retryListen() {
-        if (this.screen !== 'play' || this.platform.isDevtools)
-            return;
-        this.toldFallback = false;
-        this.beginSensors();
-    }
-    async openSensors(gen) {
-        if (this.platform.isDevtools)
-            return;
-        const motionPromise = this.platform.startMotion();
-        const accelPromise = this.platform.startAccel();
-        const motion = await motionPromise;
-        const accel = await accelPromise;
-        if (gen !== this.sensorGen)
-            return;
-        if (motion === 'ok' || accel === 'ok') {
-            this.armMotionWait();
-            return;
-        }
-        if (motion === 'unsupported' && accel === 'unsupported') {
-            this.markSensorFallback();
-            return;
-        }
-        const consent = await this.platform.requestMotionConsent();
-        if (gen !== this.sensorGen)
-            return;
-        if (consent === 'granted') {
-            const againMotion = this.platform.startMotion();
-            const againAccel = this.platform.startAccel();
-            const motionAgain = await againMotion;
-            const accelAgain = await againAccel;
-            if (gen !== this.sensorGen)
-                return;
-            if (motionAgain === 'ok' || accelAgain === 'ok') {
-                this.armMotionWait();
-                return;
-            }
-        }
-        this.markSensorDeaf();
-    }
-    armMotionWait() {
-        if (this.sensorPhase === 'live')
-            return;
-        this.sensorPhase = 'pending';
-        this.sensorWaitUntil = this.platform.now() + 1500;
-    }
-    watchSensor() {
-        if (this.platform.isDevtools || this.sensorPhase !== 'pending')
-            return;
-        if (this.platform.now() <= this.sensorWaitUntil)
-            return;
-        if (this.samplesSeen > 0 && this.detector.isLive()) {
-            this.sensorPhase = 'live';
-            return;
-        }
-        this.markSensorDeaf();
-    }
-    markSensorDeaf() {
-        this.sensorPhase = 'deaf';
-        if (this.toldFallback)
-            return;
-        this.toldFallback = true;
-        this.toast(copy_1.COPY.sensorDeaf);
-    }
-    markSensorFallback() {
-        this.sensorPhase = 'fallback';
-        if (this.toldFallback)
-            return;
-        this.toldFallback = true;
-        this.toast(copy_1.COPY.sensorFallback);
-    }
-    captureMoment(energy) {
-        const dish = this.recipe ? this.recipe.name : '';
-        const moment = {
-            dish,
-            region: this.recipe ? this.recipe.region : '',
-            line: (0, moment_1.momentLine)(dish),
-            score: this.session ? this.session.score : 0,
-            energy,
-            ink: this.recipe ? this.recipe.ink : '#c4452d',
-        };
-        this.lastMoment = moment;
-        const board = this.platform.createOffscreen(clip_1.CLIP_W, clip_1.CLIP_H);
-        if (!board)
-            return;
-        (0, clip_1.paintClip)(board.ctx, moment);
-        void board.capture().then((path) => {
-            if (path)
-                this.lastClipPath = path;
-        });
-    }
-    async shareVoluntary() {
-        const dish = (this.result && this.result.cardName) || (this.recipe ? this.recipe.name : '');
-        const score = this.session ? this.session.score : 0;
-        const moment = this.lastMoment || {
-            dish,
-            region: this.recipe ? this.recipe.region : '',
-            line: (0, moment_1.momentLine)(dish),
-            score,
-            energy: 0.6,
-            ink: this.recipe ? this.recipe.ink : '#c4452d',
-        };
-        let image;
-        const card = this.platform.createOffscreen(shareCard_1.CARD_W, shareCard_1.CARD_H);
-        if (card) {
-            (0, shareCard_1.paintShareCard)(card.ctx, moment);
-            const path = await card.capture();
-            if (path)
-                image = path;
-        }
-        const status = await this.platform.share({ title: (0, share_1.shareTitle)(dish, score), imageUrl: image, query: (0, share_1.shareQuery)() });
-        if (status !== 'ok') {
-            this.toast(copy_1.COPY.shareFail);
-            return;
-        }
-        this.refreshDate();
-        const granted = (0, daily_1.grantShareBonus)(this.daily);
-        this.daily = granted.state;
-        this.saveDaily();
-        this.toast(granted.granted ? copy_1.COPY.shareOk : copy_1.COPY.shareCap);
-    }
-    async watchAd() {
-        if (!this.ad.isConfigured()) {
-            this.toast(copy_1.COPY.adPending);
-            return;
-        }
-        const result = await this.ad.show();
-        if (result !== 'reward') {
-            this.toast(copy_1.COPY.adSkip);
-            return;
-        }
-        this.refreshDate();
-        const granted = (0, daily_1.grantAdBonus)(this.daily);
-        this.daily = granted.state;
-        this.saveDaily();
-        this.toast(granted.granted ? copy_1.COPY.adOk : copy_1.COPY.shareCap);
-    }
-    async saveClip() {
-        if (!this.lastClipPath) {
-            this.toast(copy_1.COPY.saveFail);
-            return;
-        }
-        const status = await this.platform.saveImage(this.lastClipPath);
-        this.toast(status === 'ok' ? copy_1.COPY.saveOk : copy_1.COPY.saveFail);
-    }
-    consumeEvents(events) {
-        let merged = false;
-        let burnt = false;
-        for (let i = 0; i < events.length; i += 1) {
-            const event = events[i];
-            if (event.type === 'merge')
-                merged = true;
-            else if (event.type === 'signature')
-                this.onSignature();
-            else if (event.type === 'plate')
-                this.toast(copy_1.COPY.plate);
-            else if (event.type === 'burn_warn')
-                this.toast(copy_1.COPY.warn);
-            else if (event.type === 'overflow')
-                this.toast(copy_1.COPY.overflow);
-            else if (event.type === 'burnt_piece')
-                burnt = true;
-            else if (event.type === 'fail')
-                this.finishRun(event.reason);
-        }
-        if (merged)
-            this.toast((0, toasts_1.pickToast)(this.platform.now() + 3).text);
-        if (burnt)
-            this.toast(copy_1.COPY.burntPiece);
-    }
-    onSignature() {
-        if (!this.recipe)
-            return;
-        const granted = (0, cards_1.grantCard)(this.album, {
-            recipeId: this.recipe.id,
-            name: this.recipe.name,
-            region: this.recipe.region,
-            blurb: this.recipe.blurb,
-            unlockedAt: this.platform.now(),
-        });
-        this.album = granted.album;
-        if (!granted.isNew)
-            return;
-        this.saveAlbum();
-        this.toast((0, copy_1.cardToast)(this.recipe.name));
-    }
-    finishRun(reason) {
-        if (this.ended || !this.session)
-            return;
-        this.ended = true;
-        const session = this.session;
-        const graduated = (0, difficulty_1.didGraduate)(session.merges, session.elapsedMs, session.cardsThisRun);
-        if (graduated) {
-            this.meta.runsCompleted += 1;
-            this.saveMeta();
-        }
-        const next = (0, difficulty_1.pickProfile)(this.meta.runsCompleted);
-        const quip = reason === 'burnt_out' ? toasts_1.TOAST_LINES[6].text : toasts_1.TOAST_LINES[4].text;
-        const seconds = Math.max(1, Math.round(session.elapsedMs / 1000));
-        this.result = {
-            reason,
-            score: session.score,
-            cardName: session.cardsThisRun > 0 && this.recipe ? this.recipe.name : null,
-            seconds,
-            merges: session.merges,
-            tosses: session.tossCount,
-            quip,
-            graduated,
-            nextHeatId: next.id,
-        };
-        this.screen = 'result';
-        this.toast(quip, 3400);
-        this.toast((0, copy_1.nextPotLine)(graduated, copy_1.HEAT_NAME[next.id]), 3400);
-        this.sensorGen += 1;
-        this.platform.stopSensors();
-    }
-    setTier(raw) {
-        if (raw !== 'gentle' && raw !== 'standard' && raw !== 'fierce')
-            return;
-        const tier = raw;
-        this.meta.tier = tier;
-        this.detector.setTier(tier);
-        this.saveMeta();
-        this.toast(`${copy_1.COPY.tierTitle}：${copy_1.TIER_NAME[tier]}`);
+        if (this.prep.status === 'ready')
+            this.beginCook();
+        else if (this.prep.status === 'wrong')
+            this.fail(copy_1.COPY.failPrep);
+        else if (this.prep.status === 'timeout')
+            this.fail(copy_1.COPY.failTimeout);
     }
     onSeal() {
         const now = this.platform.now();
@@ -565,49 +228,20 @@ class GameApp {
         if (this.sealTaps < 5)
             return;
         this.sealTaps = 0;
-        this.qaMode = !this.qaMode;
-        this.toast(this.qaMode ? copy_1.COPY.qaOn : copy_1.COPY.qaOff);
+        this.qa = !this.qa;
     }
-    sensorLabel() {
-        if (this.platform.isDevtools)
-            return copy_1.COPY.sensorDevtools;
-        if (this.sensorPhase === 'deaf')
-            return copy_1.COPY.sensorDeaf;
-        if (this.sensorPhase === 'fallback')
-            return copy_1.COPY.sensorFallback;
-        if (this.sensorPhase === 'live')
-            return copy_1.COPY.sensorLive;
-        return copy_1.COPY.sensorPending;
+}
+function findDish(id) {
+    for (let i = 0; i < dishes_1.DISHES.length; i += 1) {
+        if (dishes_1.DISHES[i].id === id)
+            return dishes_1.DISHES[i];
     }
-    refreshBoard() {
-        if (!leaderboard_1.BOARD_ENABLED) {
-            this.board = [];
-            return;
-        }
-        void (0, leaderboard_1.fetchRegionalBoard)((name, data) => this.platform.callCloud(name, data)).then((rows) => {
-            this.board = rows;
-        });
+    return null;
+}
+function findButton(vm, id) {
+    for (let i = 0; i < vm.buttons.length; i += 1) {
+        if (vm.buttons[i].id === id)
+            return vm.buttons[i];
     }
-    toast(text, lifeMs = 1700) {
-        const now = this.platform.now();
-        this.toasts.push({ text, seed: now % 9973, born: now, until: now + lifeMs });
-        if (this.toasts.length > 3)
-            this.toasts.shift();
-    }
-    refreshDate() {
-        const today = (0, daily_1.formatDay)(this.platform.now());
-        if (this.daily.date === today)
-            return;
-        this.daily = (0, daily_1.rollDaily)(this.daily, today);
-        this.saveDaily();
-    }
-    saveDaily() {
-        this.platform.storageSet(keys_1.KEY_DAILY, (0, daily_1.serializeDaily)(this.daily));
-    }
-    saveAlbum() {
-        this.platform.storageSet(keys_1.KEY_ALBUM, (0, cards_1.serializeAlbum)(this.album));
-    }
-    saveMeta() {
-        this.platform.storageSet(keys_1.KEY_META, (0, progress_1.serializeMeta)(this.meta));
-    }
+    return null;
 }

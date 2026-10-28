@@ -1,6 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.KEY_META = exports.KEY_ALBUM = exports.KEY_DAILY = void 0;
-exports.KEY_DAILY = 'dianshao.daily.v1';
-exports.KEY_ALBUM = 'dianshao.album.v1';
-exports.KEY_META = 'dianshao.meta.v1';
+exports.KEY_SAVE = void 0;
+/** 点单炒菜馆的存档。旧的每日锅数键不再读。 */
+exports.KEY_SAVE = 'dianshao.restaurant.v1';
