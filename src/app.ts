@@ -1,9 +1,10 @@
 import { COPY } from './content/copy';
-import { DISHES } from './content/dishes';
+import { DISHES, SERVICE_COUNT } from './content/dishes';
 import type { Dish } from './content/dishes';
 import { createCook, cueLabel, debugCook, plateCook, scoreCook, tickCook, tossCook } from './cook/model';
 import type { CookState } from './cook/model';
 import type { Rating } from './cook/score';
+import { isPassing } from './cook/score';
 import { go } from './flow/scenes';
 import type { ScreenId } from './flow/scenes';
 import { createTossDetector } from './input/gyro';
@@ -12,7 +13,7 @@ import { hitTest } from './input/pointer';
 import { SensorMux } from './input/sensors';
 import { runLoop } from './loop';
 import { KEY_SAVE } from './meta/keys';
-import { applyPlate, isUnlocked, parseSave, serializeSave } from './meta/save';
+import { applyPlate, clearedCount, isUnlocked, parseSave, serializeSave } from './meta/save';
 import type { SaveState } from './meta/save';
 import { acceptOrder, createOrder, tickOrder } from './order/ticket';
 import type { OrderState } from './order/ticket';
@@ -21,6 +22,7 @@ import { createPrep, tapPrep, tickPrep } from './prep/board';
 import type { PrepState } from './prep/board';
 import { compose } from './ui/compose';
 import type { PlateView, StubCook } from './ui/compose';
+import { JOURNAL_H, JOURNAL_W, paintJournal } from './plate/journal';
 import { paint } from './ui/paint';
 import { loadCollage } from './ui/sprites';
 import type { ViewModel } from './ui/types';
@@ -49,6 +51,8 @@ class Game {
   private burnScale = 1;
   private plate: PlateView | null = null;
   private teach = '';
+  private justCleared = false;
+  private journalPath: string | null = null;
   private qa = false;
   private sealTaps = 0;
   private sealWindow = 0;
@@ -98,6 +102,7 @@ class Game {
       prep: this.prep,
       cook: this.cookView(),
       plate: this.plate,
+      justCleared: this.justCleared,
       teach: this.sensorTeach(),
       debugLines: this.qa && this.cook ? debugCook(this.cook) : [],
       qa: this.qa && this.screen === 'cook',
@@ -146,6 +151,9 @@ class Game {
     else if (id === 'scale-down') this.nudgeScale(-0.2);
     else if (id === 'retryListen') this.beginSensors();
     else if (id === 'retry') this.retry();
+    else if (id === 'clear') this.showClear();
+    else if (id === 'share') void this.shareJournal();
+    else if (id === 'save') void this.saveJournal();
     else if (id === 'album') this.screen = go(this.screen, 'album');
     else if (id === 'home') this.goHome();
   }
@@ -237,9 +245,59 @@ class Game {
     this.save = applied.save;
     this.platform.storageSet(KEY_SAVE, serializeSave(this.save));
     const note = rating === 'wreck' ? reason : applied.kept ? COPY.kept : COPY.skipped;
+    this.justCleared = isPassing(rating) && clearedCount(this.save, DISHES) >= SERVICE_COUNT && !applied.save.clearSeen;
     this.plate = { dish: this.dish, score, rating, kept: applied.kept, reason: note };
     this.screen = 'plate';
     this.stopEars();
+    this.captureJournal();
+  }
+
+  private captureJournal(): void {
+    if (!this.plate) return;
+    const board = this.platform.createOffscreen(JOURNAL_W, JOURNAL_H);
+    if (!board) {
+      this.journalPath = null;
+      return;
+    }
+    const plate = this.plate;
+    paintJournal(board.ctx, {
+      dish: plate.dish.name,
+      region: plate.dish.region,
+      rating: plate.rating,
+      quip: plate.dish.quips[plate.rating],
+      science: plate.dish.science,
+      score: plate.score,
+    });
+    this.journalPath = null;
+    void board.capture().then((path) => {
+      if (path) this.journalPath = path;
+    });
+  }
+
+  private async shareJournal(): Promise<void> {
+    if (!this.plate) return;
+    const status = await this.platform.share({
+      title: `${this.plate.dish.name} · ${this.plate.score}分`,
+      imageUrl: this.journalPath || undefined,
+      query: 'from=journal',
+    });
+    this.teach = status === 'ok' ? COPY.shareOk : COPY.shareFail;
+  }
+
+  private async saveJournal(): Promise<void> {
+    if (!this.journalPath) {
+      this.teach = COPY.saveFail;
+      return;
+    }
+    const status = await this.platform.saveImage(this.journalPath);
+    this.teach = status === 'ok' ? COPY.saveOk : COPY.saveFail;
+  }
+
+  private showClear(): void {
+    this.save = Object.assign({}, this.save, { clearSeen: true });
+    this.platform.storageSet(KEY_SAVE, serializeSave(this.save));
+    this.justCleared = false;
+    this.screen = go('plate', 'clear');
   }
 
   private retry(): void {

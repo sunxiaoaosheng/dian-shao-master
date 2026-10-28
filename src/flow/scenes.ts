@@ -12,6 +12,7 @@ export function go(screen: ScreenId, event: FlowEvent): ScreenId {
   if (screen === 'prep' && event === 'ready') return 'cook';
   if (screen === 'cook' && event === 'plate') return 'plate';
   if (screen === 'plate' && event === 'retry') return 'order';
+  if (screen === 'plate' && event === 'clear') return 'clear';
   if (screen === 'plate' && event === 'album') return 'album';
   return screen;
 }

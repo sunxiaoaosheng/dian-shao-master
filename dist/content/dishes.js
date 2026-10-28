@@ -13,6 +13,12 @@ const POTATO = { id: 'potato', name: '土豆', ink: '#c4a574' };
 const GARLIC = { id: 'garlic', name: '蒜', ink: '#f3e6cf' };
 const LETTUCE = { id: 'lettuce', name: '油麦菜', ink: '#3f7d45' };
 const RICE = { id: 'rice', name: '米饭', ink: '#f6efe2' };
+const PORK = { id: 'pork', name: '肉丝', ink: '#e7b2a4' };
+const BAMBOO = { id: 'bamboo', name: '笋丝', ink: '#e6d7a8' };
+const EAR = { id: 'ear', name: '木耳', ink: '#2a2e32' };
+const CHICKEN = { id: 'chicken', name: '鸡丁', ink: '#e3b23c' };
+const PEANUT = { id: 'peanut', name: '花生', ink: '#c4a574' };
+const LAMB = { id: 'lamb', name: '羊肉', ink: '#a33b32' };
 /** 今晚六桌。配置还没齐的时候，主页分母也按六算。 */
 exports.SERVICE_COUNT = 6;
 exports.DISHES = [
@@ -116,6 +122,104 @@ exports.DISHES = [
             { id: 'rice-in', at: 0.1, window: 0.08, label: '下米饭', kind: 'drop' },
             { id: 'egg-in', at: 0.32, window: 0.07, label: '下蛋液', kind: 'drop' },
             { id: 'scallion-in', at: 0.84, window: 0.07, label: '下葱花', kind: 'late' },
+        ],
+    },
+    {
+        id: 'yuxiang',
+        name: '鱼香肉丝',
+        region: '川',
+        style: '勾芡时机，调味一次对',
+        gate: 'back',
+        science: '鱼香靠泡椒和糖醋，勾芡要赶在出锅前。',
+        album: '川菜：肉丝先滑散，调味汁一次下准。芡汁临出锅再淋，颠开就盛，停久了会结坨。少辣的客人别再加干辣椒。',
+        quips: {
+            wreck: '芡结坨了，味也没合上。',
+            pass: '鱼香出来了。',
+            sign: '这盘肉丝能上席。',
+            god: '芡亮，味也齐。',
+        },
+        orderSeconds: 16,
+        pace: 1,
+        taboo: '少辣',
+        prepSeconds: 18,
+        need: [PORK, BAMBOO, EAR],
+        decoys: [POTATO],
+        tabooPiece: PEPPER,
+        cookSeconds: 15,
+        phases: [
+            { until: 0.4, want: 'toss', evenPerSec: 16, burnPerSec: 30, idleBurnPerSec: 7, hint: '颠：肉丝先滑散' },
+            { until: 0.58, want: 'hold', evenPerSec: 4, burnPerSec: 38, idleBurnPerSec: 2, hint: '停：调味汁一次下准' },
+            { until: 0.82, want: 'toss', evenPerSec: 15, burnPerSec: 32, idleBurnPerSec: 8, hint: '颠：勾芡，把汁颠开' },
+            { until: 1, want: 'hold', evenPerSec: 3, burnPerSec: 46, idleBurnPerSec: 3, hint: '停：马上盛，芡会结' },
+        ],
+        drops: [
+            { id: 'sauce', at: 0.28, window: 0.07, label: '下调味', kind: 'drop' },
+            { id: 'starch', at: 0.7, window: 0.06, label: '淋芡', kind: 'starch' },
+        ],
+    },
+    {
+        id: 'gongbao',
+        name: '宫保鸡丁',
+        region: '川',
+        style: '糊辣香，花生最后下',
+        gate: 'back',
+        science: '花生最后下，才听得见脆，不会糊成渣。',
+        album: '川菜：鸡丁大火颠到糊辣香，临出锅再下花生。花生下早了会苦。少辣就别再点干辣椒。',
+        quips: {
+            wreck: '花生糊了，鸡也老了。',
+            pass: '糊辣香有了。',
+            sign: '花生还是脆的。',
+            god: '糊辣香，花生脆。',
+        },
+        orderSeconds: 14,
+        pace: 0.95,
+        taboo: '少辣',
+        prepSeconds: 16,
+        need: [CHICKEN, PEANUT, SCALLION],
+        decoys: [POTATO],
+        tabooPiece: PEPPER,
+        cookSeconds: 13,
+        phases: [
+            { until: 0.58, want: 'toss', evenPerSec: 16, burnPerSec: 34, idleBurnPerSec: 9, hint: '颠：大火，颠出糊辣香' },
+            { until: 0.7, want: 'hold', evenPerSec: 3, burnPerSec: 40, idleBurnPerSec: 2, hint: '停：鸡丁定一下' },
+            { until: 0.9, want: 'toss', evenPerSec: 14, burnPerSec: 30, idleBurnPerSec: 7, hint: '颠：花生最后下' },
+            { until: 1, want: 'hold', evenPerSec: 3, burnPerSec: 48, idleBurnPerSec: 3, hint: '停：出锅保住脆' },
+        ],
+        drops: [
+            { id: 'chicken-in', at: 0.16, window: 0.08, label: '下鸡丁', kind: 'drop' },
+            { id: 'peanut-in', at: 0.8, window: 0.06, label: '下花生', kind: 'late' },
+        ],
+    },
+    {
+        id: 'yangrou',
+        name: '葱爆羊肉',
+        region: '京鲁',
+        style: '猛火快炒，葱后下',
+        gate: 'back',
+        science: '羊肉用猛火快炒，葱段后下，才香不发闷。',
+        album: '京鲁：锅烧热，羊肉猛火快颠，葱段最后下，再颠几下就出。火小了会膻，葱下早了会闷。',
+        quips: {
+            wreck: '火软了，又膻又闷。',
+            pass: '葱香盖住了膻。',
+            sign: '这盘羊肉够猛。',
+            god: '猛火，葱香刚好。',
+        },
+        orderSeconds: 10,
+        pace: 0.75,
+        taboo: null,
+        prepSeconds: 12,
+        need: [LAMB, SCALLION],
+        decoys: [POTATO],
+        tabooPiece: PEPPER,
+        cookSeconds: 8,
+        phases: [
+            { until: 0.62, want: 'toss', evenPerSec: 26, burnPerSec: 36, idleBurnPerSec: 16, hint: '颠：猛火，羊肉快炒' },
+            { until: 0.86, want: 'toss', evenPerSec: 18, burnPerSec: 32, idleBurnPerSec: 10, hint: '颠：葱后下，再颠两下' },
+            { until: 1, want: 'hold', evenPerSec: 4, burnPerSec: 64, idleBurnPerSec: 4, hint: '停：立刻出锅' },
+        ],
+        drops: [
+            { id: 'lamb-in', at: 0.14, window: 0.08, label: '下羊肉', kind: 'drop' },
+            { id: 'scallion-late', at: 0.74, window: 0.07, label: '下葱段', kind: 'late' },
         ],
     },
 ];

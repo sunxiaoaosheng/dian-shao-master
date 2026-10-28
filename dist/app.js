@@ -4,6 +4,7 @@ exports.startGame = startGame;
 const copy_1 = require("./content/copy");
 const dishes_1 = require("./content/dishes");
 const model_1 = require("./cook/model");
+const score_1 = require("./cook/score");
 const scenes_1 = require("./flow/scenes");
 const gyro_1 = require("./input/gyro");
 const pointer_1 = require("./input/pointer");
@@ -14,6 +15,7 @@ const save_1 = require("./meta/save");
 const ticket_1 = require("./order/ticket");
 const board_1 = require("./prep/board");
 const compose_1 = require("./ui/compose");
+const journal_1 = require("./plate/journal");
 const paint_1 = require("./ui/paint");
 const sprites_1 = require("./ui/sprites");
 /** 接单和备料都计时。错点满三次，或时间到还没备齐，这单失败。 */
@@ -37,6 +39,8 @@ class Game {
         this.burnScale = 1;
         this.plate = null;
         this.teach = '';
+        this.justCleared = false;
+        this.journalPath = null;
         this.qa = false;
         this.sealTaps = 0;
         this.sealWindow = 0;
@@ -83,6 +87,7 @@ class Game {
             prep: this.prep,
             cook: this.cookView(),
             plate: this.plate,
+            justCleared: this.justCleared,
             teach: this.sensorTeach(),
             debugLines: this.qa && this.cook ? (0, model_1.debugCook)(this.cook) : [],
             qa: this.qa && this.screen === 'cook',
@@ -147,6 +152,12 @@ class Game {
             this.beginSensors();
         else if (id === 'retry')
             this.retry();
+        else if (id === 'clear')
+            this.showClear();
+        else if (id === 'share')
+            void this.shareJournal();
+        else if (id === 'save')
+            void this.saveJournal();
         else if (id === 'album')
             this.screen = (0, scenes_1.go)(this.screen, 'album');
         else if (id === 'home')
@@ -236,9 +247,58 @@ class Game {
         this.save = applied.save;
         this.platform.storageSet(keys_1.KEY_SAVE, (0, save_1.serializeSave)(this.save));
         const note = rating === 'wreck' ? reason : applied.kept ? copy_1.COPY.kept : copy_1.COPY.skipped;
+        this.justCleared = (0, score_1.isPassing)(rating) && (0, save_1.clearedCount)(this.save, dishes_1.DISHES) >= dishes_1.SERVICE_COUNT && !applied.save.clearSeen;
         this.plate = { dish: this.dish, score, rating, kept: applied.kept, reason: note };
         this.screen = 'plate';
         this.stopEars();
+        this.captureJournal();
+    }
+    captureJournal() {
+        if (!this.plate)
+            return;
+        const board = this.platform.createOffscreen(journal_1.JOURNAL_W, journal_1.JOURNAL_H);
+        if (!board) {
+            this.journalPath = null;
+            return;
+        }
+        const plate = this.plate;
+        (0, journal_1.paintJournal)(board.ctx, {
+            dish: plate.dish.name,
+            region: plate.dish.region,
+            rating: plate.rating,
+            quip: plate.dish.quips[plate.rating],
+            science: plate.dish.science,
+            score: plate.score,
+        });
+        this.journalPath = null;
+        void board.capture().then((path) => {
+            if (path)
+                this.journalPath = path;
+        });
+    }
+    async shareJournal() {
+        if (!this.plate)
+            return;
+        const status = await this.platform.share({
+            title: `${this.plate.dish.name} · ${this.plate.score}分`,
+            imageUrl: this.journalPath || undefined,
+            query: 'from=journal',
+        });
+        this.teach = status === 'ok' ? copy_1.COPY.shareOk : copy_1.COPY.shareFail;
+    }
+    async saveJournal() {
+        if (!this.journalPath) {
+            this.teach = copy_1.COPY.saveFail;
+            return;
+        }
+        const status = await this.platform.saveImage(this.journalPath);
+        this.teach = status === 'ok' ? copy_1.COPY.saveOk : copy_1.COPY.saveFail;
+    }
+    showClear() {
+        this.save = Object.assign({}, this.save, { clearSeen: true });
+        this.platform.storageSet(keys_1.KEY_SAVE, (0, save_1.serializeSave)(this.save));
+        this.justCleared = false;
+        this.screen = (0, scenes_1.go)('plate', 'clear');
     }
     retry() {
         if (!this.dish)

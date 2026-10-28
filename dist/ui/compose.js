@@ -55,7 +55,7 @@ function layoutHome(input, vm) {
         (0, copy_1.windowLine)(show ? show.rating : null, showDish, show ? show.score : 0),
     ];
     let y = input.safeTop + 168;
-    const catalog = input.catalog.length ? input.catalog : dishes_1.DISHES;
+    const catalog = input.catalog;
     for (let i = 0; i < catalog.length; i += 1) {
         const dish = catalog[i];
         const open = (0, save_1.isUnlocked)(input.save, dish, catalog);
@@ -127,13 +127,20 @@ function layoutPlate(input, vm) {
     vm.lines = plate
         ? [`${plate.score} 分`, plate.dish.quips[plate.rating], plate.dish.science, plate.reason]
         : [];
-    let y = input.safeTop + 250;
+    let y = input.safeTop + 280;
     if (plate && plate.rating === 'wreck') {
         vm.buttons.push(button('retry', copy_1.COPY.retry, 18, y, input.width - 36, 48, true, false));
         y += 58;
     }
-    vm.buttons.push(button('home', copy_1.COPY.next, 18, y, input.width - 36, 46, plate ? plate.rating !== 'wreck' : true, false));
-    vm.buttons.push(button('album', copy_1.COPY.album, 18, y + 56, input.width - 36, 44, false, false));
+    if (input.justCleared) {
+        vm.buttons.push(button('clear', '看今晚六桌', 18, y, input.width - 36, 48, true, false));
+        y += 58;
+    }
+    vm.buttons.push(button('home', copy_1.COPY.next, 18, y, input.width - 36, 46, plate ? plate.rating !== 'wreck' && !input.justCleared : true, false));
+    y += 54;
+    vm.buttons.push(button('share', copy_1.COPY.share, 18, y, input.width - 36, 44, false, false));
+    vm.buttons.push(button('save', copy_1.COPY.save, 18, y + 52, input.width - 36, 44, false, false));
+    vm.buttons.push(button('album', copy_1.COPY.album, 18, y + 104, input.width - 36, 44, false, false));
 }
 function layoutAlbum(input, vm) {
     vm.title = copy_1.COPY.album;
@@ -141,7 +148,8 @@ function layoutAlbum(input, vm) {
     const lines = [];
     for (let i = 0; i < input.catalog.length; i += 1) {
         const dish = input.catalog[i];
-        lines.push(dish.name);
+        const best = input.save.plates[dish.id];
+        lines.push(best ? `${dish.name} · ${(0, copy_1.ratingLabel)(best.rating)} ${best.score}` : `${dish.name} · 还没做出及格`);
         lines.push(dish.science);
         lines.push(dish.album);
     }
@@ -151,7 +159,7 @@ function layoutAlbum(input, vm) {
 function layoutClear(input, vm) {
     vm.title = copy_1.COPY.clearTitle;
     vm.subtitle = copy_1.COPY.subtitle;
-    vm.lines = [copy_1.COPY.clearBody, (0, copy_1.clearLine)((0, save_1.clearedCount)(input.save, input.catalog), input.catalog.length)];
+    vm.lines = [copy_1.COPY.clearBody, (0, copy_1.clearLine)((0, save_1.clearedCount)(input.save, input.catalog), dishes_1.SERVICE_COUNT)];
     vm.buttons.push(button('home', copy_1.COPY.back, 18, input.safeTop + 240, input.width - 36, 48, true, false));
 }
 function button(id, label, x, y, w, h, primary, disabled) {

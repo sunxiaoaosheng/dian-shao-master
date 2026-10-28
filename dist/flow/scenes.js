@@ -19,6 +19,8 @@ function go(screen, event) {
         return 'plate';
     if (screen === 'plate' && event === 'retry')
         return 'order';
+    if (screen === 'plate' && event === 'clear')
+        return 'clear';
     if (screen === 'plate' && event === 'album')
         return 'album';
     return screen;

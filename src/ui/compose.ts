@@ -4,7 +4,7 @@ import type { Rating } from '../cook/score';
 import type { ScreenId } from '../flow/scenes';
 import type { SaveState } from '../meta/save';
 import { clearedCount, isUnlocked, showcaseOf } from '../meta/save';
-import { DISHES, SERVICE_COUNT } from '../content/dishes';
+import { SERVICE_COUNT } from '../content/dishes';
 import type { OrderState } from '../order/ticket';
 import type { PrepState } from '../prep/board';
 import type { ButtonVM, ChipVM, ViewModel } from './types';
@@ -37,6 +37,7 @@ export interface ComposeInput {
   prep: PrepState | null;
   cook: StubCook | null;
   plate: PlateView | null;
+  justCleared: boolean;
   teach: string;
   debugLines: string[];
   qa: boolean;
@@ -88,7 +89,7 @@ function layoutHome(input: ComposeInput, vm: ViewModel): void {
     windowLine(show ? show.rating : null, showDish, show ? show.score : 0),
   ];
   let y = input.safeTop + 168;
-  const catalog = input.catalog.length ? input.catalog : DISHES;
+  const catalog = input.catalog;
   for (let i = 0; i < catalog.length; i += 1) {
     const dish = catalog[i];
     const open = isUnlocked(input.save, dish, catalog);
@@ -173,13 +174,20 @@ function layoutPlate(input: ComposeInput, vm: ViewModel): void {
   vm.lines = plate
     ? [`${plate.score} 分`, plate.dish.quips[plate.rating], plate.dish.science, plate.reason]
     : [];
-  let y = input.safeTop + 250;
+  let y = input.safeTop + 280;
   if (plate && plate.rating === 'wreck') {
     vm.buttons.push(button('retry', COPY.retry, 18, y, input.width - 36, 48, true, false));
     y += 58;
   }
-  vm.buttons.push(button('home', COPY.next, 18, y, input.width - 36, 46, plate ? plate.rating !== 'wreck' : true, false));
-  vm.buttons.push(button('album', COPY.album, 18, y + 56, input.width - 36, 44, false, false));
+  if (input.justCleared) {
+    vm.buttons.push(button('clear', '看今晚六桌', 18, y, input.width - 36, 48, true, false));
+    y += 58;
+  }
+  vm.buttons.push(button('home', COPY.next, 18, y, input.width - 36, 46, plate ? plate.rating !== 'wreck' && !input.justCleared : true, false));
+  y += 54;
+  vm.buttons.push(button('share', COPY.share, 18, y, input.width - 36, 44, false, false));
+  vm.buttons.push(button('save', COPY.save, 18, y + 52, input.width - 36, 44, false, false));
+  vm.buttons.push(button('album', COPY.album, 18, y + 104, input.width - 36, 44, false, false));
 }
 
 function layoutAlbum(input: ComposeInput, vm: ViewModel): void {
@@ -188,7 +196,8 @@ function layoutAlbum(input: ComposeInput, vm: ViewModel): void {
   const lines: string[] = [];
   for (let i = 0; i < input.catalog.length; i += 1) {
     const dish = input.catalog[i];
-    lines.push(dish.name);
+    const best = input.save.plates[dish.id];
+    lines.push(best ? `${dish.name} · ${ratingLabel(best.rating)} ${best.score}` : `${dish.name} · 还没做出及格`);
     lines.push(dish.science);
     lines.push(dish.album);
   }
@@ -199,7 +208,7 @@ function layoutAlbum(input: ComposeInput, vm: ViewModel): void {
 function layoutClear(input: ComposeInput, vm: ViewModel): void {
   vm.title = COPY.clearTitle;
   vm.subtitle = COPY.subtitle;
-  vm.lines = [COPY.clearBody, clearLine(clearedCount(input.save, input.catalog), input.catalog.length)];
+  vm.lines = [COPY.clearBody, clearLine(clearedCount(input.save, input.catalog), SERVICE_COUNT)];
   vm.buttons.push(button('home', COPY.back, 18, input.safeTop + 240, input.width - 36, 48, true, false));
 }
 

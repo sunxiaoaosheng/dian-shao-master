@@ -27,6 +27,8 @@ const {
   passed,
 } = require('../dist/meta/save');
 const { go } = require('../dist/flow/scenes');
+const { clearLine, todayLine, windowLine } = require('../dist/content/copy');
+const { JOURNAL_W, JOURNAL_H, paintJournal } = require('../dist/plate/journal');
 const { createOrder, tickOrder, acceptOrder } = require('../dist/order/ticket');
 const { createPrep, tapPrep, tickPrep, PREP_MAX_WRONG } = require('../dist/prep/board');
 const { createCook, tickCook, tossCook, scoreCook, plateCook } = require('../dist/cook/model');
@@ -37,7 +39,10 @@ function testDishes() {
   assert.equal(SERVICE_COUNT, 6);
   assert.equal(DISHES[0].id, 'fanqie');
   assert.equal(DISHES[0].name, '番茄炒蛋');
-  assert.deepEqual(DISHES.map((dish) => dish.id), ['fanqie', 'youmai', 'chaofan']);
+  assert.deepEqual(DISHES.map((dish) => dish.id), ['fanqie', 'youmai', 'chaofan', 'yuxiang', 'gongbao', 'yangrou']);
+  assert.equal(dishById('yuxiang').drops.some((drop) => drop.kind === 'starch'), true);
+  assert.equal(dishById('gongbao').drops.some((drop) => drop.kind === 'late' && drop.label.includes('花生')), true);
+  assert.equal(dishById('yangrou').drops.some((drop) => drop.label.includes('葱')), true);
   const youmai = dishById('youmai');
   assert.ok(createOrder(youmai, true).totalMs < youmai.orderSeconds * 1000);
   assert.ok(phaseAt(DISHES[0], 0).hint.includes('蛋'));
@@ -81,6 +86,35 @@ function testSave() {
   assert.equal(nextDay.plates.fanqie.score, 90);
   assert.equal(isUnlocked(save, DISHES[0], DISHES), true);
   assert.equal(clearedCount(better.save, DISHES), 1);
+  assert.equal(isUnlocked(save, dishById('yuxiang'), DISHES), false);
+  let opened = save;
+  const front = ['fanqie', 'youmai', 'chaofan'];
+  for (let i = 0; i < front.length; i += 1) {
+    opened = applyPlate(opened, { dishId: front[i], score: 70, rating: 'pass', at: now }, now).save;
+  }
+  assert.equal(isUnlocked(opened, dishById('gongbao'), DISHES), true);
+  assert.equal(isUnlocked(opened, dishById('yangrou'), DISHES), true);
+  assert.equal(clearedCount(opened, DISHES), 3);
+  const back = ['yuxiang', 'gongbao', 'yangrou'];
+  for (let i = 0; i < back.length; i += 1) {
+    opened = applyPlate(opened, { dishId: back[i], score: 75, rating: 'pass', at: now }, now).save;
+  }
+  assert.equal(clearedCount(opened, DISHES), SERVICE_COUNT);
+  assert.equal(go('plate', 'clear'), 'clear');
+  const passOnly = applyPlate(emptySave(now), { dishId: 'fanqie', score: 70, rating: 'pass', at: now }, now);
+  assert.equal(showcaseOf(passOnly.save), null);
+  assert.equal(clearLine(2, 6), '通关 2/6');
+  assert.ok(todayLine(0, '').includes('还没有'));
+  assert.ok(windowLine('god', '葱爆羊肉', 95).includes('神菜'));
+  assert.equal(JOURNAL_W * 16, JOURNAL_H * 9);
+  paintJournal(mockCtx(), {
+    dish: '番茄炒蛋',
+    region: '家常',
+    rating: 'sign',
+    quip: '这盘能上台面。',
+    science: DISHES[0].science,
+    score: 88,
+  });
 }
 
 function testFlow() {

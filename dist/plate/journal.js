@@ -1,0 +1,40 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.JOURNAL_H = exports.JOURNAL_W = void 0;
+exports.paintJournal = paintJournal;
+const copy_1 = require("../content/copy");
+const draw_1 = require("../ui/draw");
+const theme_1 = require("../ui/theme");
+/** 出锅强制的一帧手账。9:16，方便分享。 */
+exports.JOURNAL_W = 540;
+exports.JOURNAL_H = 960;
+function paintJournal(ctx, card) {
+    (0, draw_1.paintPaper)(ctx, exports.JOURNAL_W, exports.JOURNAL_H);
+    ctx.save();
+    ctx.translate(36, 48);
+    (0, draw_1.fillTorn)(ctx, exports.JOURNAL_W - 72, exports.JOURNAL_H - 96, 7, theme_1.PALETTE.white, 0.04);
+    ctx.restore();
+    ctx.fillStyle = theme_1.PALETTE.chiliDeep;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = (0, theme_1.font)(22, false);
+    ctx.fillText(copy_1.COPY.title, 64, 88);
+    ctx.fillStyle = theme_1.PALETTE.inkSoft;
+    ctx.font = (0, theme_1.font)(18, false);
+    ctx.fillText(card.region, 64, 124);
+    ctx.fillStyle = theme_1.PALETTE.ink;
+    ctx.font = (0, theme_1.font)(42, true);
+    ctx.fillText(card.dish, 64, 168);
+    ctx.fillStyle = theme_1.PALETTE.chili;
+    ctx.font = (0, theme_1.font)(36, true);
+    ctx.fillText((0, copy_1.ratingLabel)(card.rating), 64, 240);
+    ctx.fillStyle = theme_1.PALETTE.ink;
+    ctx.font = (0, theme_1.font)(28, true);
+    ctx.fillText(`${card.score} 分`, 64, 300);
+    ctx.font = (0, theme_1.font)(22, false);
+    ctx.fillStyle = theme_1.PALETTE.ink;
+    (0, draw_1.drawWrapped)(ctx, card.quip, 64, 360, exports.JOURNAL_W - 128, 32);
+    ctx.fillStyle = theme_1.PALETTE.inkSoft;
+    ctx.font = (0, theme_1.font)(18, false);
+    (0, draw_1.drawWrapped)(ctx, card.science, 64, 470, exports.JOURNAL_W - 128, 28);
+}
