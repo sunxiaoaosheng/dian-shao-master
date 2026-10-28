@@ -23,6 +23,7 @@ function createPrep(dish, enforce, includeDecoys) {
         totalMs: total,
         enforce,
         status: 'working',
+        missId: '',
     };
 }
 function tapPrep(state, id) {
@@ -39,7 +40,7 @@ function tapPrep(state, id) {
     if (found.role === 'need') {
         found.got = true;
         const ready = pieces.every((piece) => piece.role !== 'need' || piece.got);
-        return Object.assign({}, state, { pieces, status: ready ? 'ready' : 'working' });
+        return Object.assign({}, state, { pieces, status: ready ? 'ready' : 'working', missId: '' });
     }
     const wrong = state.wrong + 1;
     const failed = state.enforce && wrong >= state.maxWrong;
@@ -47,6 +48,7 @@ function tapPrep(state, id) {
         pieces,
         wrong,
         status: failed ? 'wrong' : state.status,
+        missId: found.id,
     });
 }
 function tickPrep(state, dtMs) {

@@ -16,6 +16,8 @@ export interface PrepState {
   totalMs: number;
   enforce: boolean;
   status: 'working' | 'ready' | 'wrong' | 'timeout';
+  /** 最近一次点错的原料，用来画红叉。 */
+  missId: string;
 }
 
 export const PREP_MAX_WRONG = 3;
@@ -36,6 +38,7 @@ export function createPrep(dish: Dish, enforce: boolean, includeDecoys: boolean)
     totalMs: total,
     enforce,
     status: 'working',
+    missId: '',
   };
 }
 
@@ -50,7 +53,7 @@ export function tapPrep(state: PrepState, id: string): PrepState {
   if (found.role === 'need') {
     found.got = true;
     const ready = pieces.every((piece) => piece.role !== 'need' || piece.got);
-    return Object.assign({}, state, { pieces, status: ready ? 'ready' : 'working' });
+    return Object.assign({}, state, { pieces, status: ready ? 'ready' : 'working', missId: '' });
   }
   const wrong = state.wrong + 1;
   const failed = state.enforce && wrong >= state.maxWrong;
@@ -58,6 +61,7 @@ export function tapPrep(state: PrepState, id: string): PrepState {
     pieces,
     wrong,
     status: failed ? 'wrong' : state.status,
+    missId: found.id,
   });
 }
 

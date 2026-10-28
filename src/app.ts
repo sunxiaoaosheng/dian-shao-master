@@ -52,6 +52,7 @@ class Game {
   private plate: PlateView | null = null;
   private teach = '';
   private justCleared = false;
+  private albumPage = 0;
   private journalPath: string | null = null;
   private journalWait: Promise<void> = Promise.resolve();
   private qa = false;
@@ -105,6 +106,7 @@ class Game {
       plate: this.plate,
       justCleared: this.justCleared,
       teach: this.sensorTeach(),
+      albumPage: this.albumPage,
       debugLines: this.qa && this.cook ? debugCook(this.cook) : [],
       qa: this.qa && this.screen === 'cook',
       offerRetry: !this.platform.isDevtools && this.screen === 'cook' && (this.sensorPhase === 'deaf' || this.sensorPhase === 'fallback'),
@@ -120,6 +122,7 @@ class Game {
       leftMs: Math.max(0, this.cook.durationMs - this.cook.elapsedMs),
       totalMs: this.cook.durationMs,
       hint: cue ? `下料：${cue}` : this.cook.hint,
+      tossing: this.cook.pulseMs > 0,
     };
   }
 
@@ -161,7 +164,11 @@ class Game {
     else if (id === 'clear') this.showClear();
     else if (id === 'share') void this.shareJournal();
     else if (id === 'save') void this.saveJournal();
-    else if (id === 'album') this.screen = go(this.screen, 'album');
+    else if (id === 'album') {
+      if (this.screen !== 'album') this.albumPage = 0;
+      this.screen = go(this.screen, 'album');
+    } else if (id === 'album-prev') this.albumPage = Math.max(0, this.albumPage - 1);
+    else if (id === 'album-next') this.albumPage += 1;
     else if (id === 'home') this.goHome();
   }
 

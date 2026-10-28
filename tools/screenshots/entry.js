@@ -33,6 +33,7 @@ function blank() {
     plate: null,
     justCleared: false,
     teach: '',
+    albumPage: 0,
     debugLines: [],
     qa: false,
     offerRetry: false,
@@ -47,6 +48,7 @@ function cookView(cook) {
     leftMs: Math.max(0, cook.durationMs - cook.elapsedMs),
     totalMs: cook.durationMs,
     hint: cue ? `下料：${cue}` : cook.hint,
+    tossing: cook.pulseMs > 0,
   };
 }
 
@@ -85,10 +87,10 @@ function scenes() {
 
   const prep = blank();
   prep.screen = 'prep';
-  prep.prep = tapPrep(createPrep(fanqie, true, true), 'egg');
+  prep.prep = tapPrep(tapPrep(createPrep(fanqie, true, true), 'egg'), 'potato');
   prep.teach = COPY.teachPrep;
 
-  const tossing = advance(fanqie, 0.12, false);
+  const tossing = tossCook(advance(fanqie, 0.12, false));
   const cookToss = blank();
   cookToss.screen = 'cook';
   cookToss.cook = cookView(tossing);
@@ -123,13 +125,13 @@ function scenes() {
   clear.save = passedSave();
 
   return {
-    '01-home': { w: W, h: H, draw: (ctx) => paint(ctx, compose(home)) },
-    '02-order': { w: W, h: H, draw: (ctx) => paint(ctx, compose(order)) },
-    '03-prep': { w: W, h: H, draw: (ctx) => paint(ctx, compose(prep)) },
-    '04-cook-toss': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookToss)) },
-    '05-cook-hold': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookHold)) },
-    '06-plate': { w: W, h: H, draw: (ctx) => paint(ctx, compose(plate)) },
-    '07-journal': {
+    '01-home-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(home)) },
+    '02-order-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(order)) },
+    '03-prep-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(prep)) },
+    '04-cook-toss-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookToss)) },
+    '05-cook-hold-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(cookHold)) },
+    '06-plate-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(plate)) },
+    '07-journal-v2': {
       w: JOURNAL_W,
       h: JOURNAL_H,
       draw: (ctx) => paintJournal(ctx, {
@@ -141,8 +143,8 @@ function scenes() {
         score: 88,
       }),
     },
-    '08-album': { w: W, h: H, draw: (ctx) => paint(ctx, compose(album)) },
-    '09-clear': { w: W, h: H, draw: (ctx) => paint(ctx, compose(clear)) },
+    '08-album-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(album)) },
+    '09-clear-v2': { w: W, h: H, draw: (ctx) => paint(ctx, compose(clear)) },
   };
 }
 
