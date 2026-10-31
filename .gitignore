@@ -1,0 +1,8 @@
+node_modules/
+tools/screenshots/node_modules/
+tools/screenshots/bundle.js
+*.log
+.DS_Store
+project.private.config.json
+.idea/
+.vscode/

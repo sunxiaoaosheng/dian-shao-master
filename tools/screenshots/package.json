@@ -1,0 +1,12 @@
+{
+  "name": "dianshao-screenshots",
+  "private": true,
+  "description": "用无头 Chrome 把现有 compose/paint 画到画布上。不进小游戏包。",
+  "scripts": {
+    "shoot": "node run.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "puppeteer-core": "24.23.0"
+  }
+}

@@ -1,0 +1,43 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.JOURNAL_H = exports.JOURNAL_W = void 0;
+exports.paintJournal = paintJournal;
+const copy_1 = require("../content/copy");
+const draw_1 = require("../ui/draw");
+const press_1 = require("../ui/press");
+const theme_1 = require("../ui/theme");
+/** 出锅强制的一帧手账。9:16，老字号竖版传单。 */
+exports.JOURNAL_W = 540;
+exports.JOURNAL_H = 960;
+function paintJournal(ctx, card) {
+    (0, press_1.paintSheet)(ctx, exports.JOURNAL_W, exports.JOURNAL_H);
+    (0, press_1.drawMenuFrame)(ctx, exports.JOURNAL_W, exports.JOURNAL_H);
+    ctx.fillStyle = theme_1.PALETTE.chili;
+    ctx.font = (0, theme_1.font)(16, true);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('老字号 · 颠勺王', exports.JOURNAL_W / 2, 36);
+    (0, press_1.drawMenuRule)(ctx, 70, 64, exports.JOURNAL_W - 140);
+    ctx.fillStyle = theme_1.PALETTE.ink;
+    ctx.font = (0, theme_1.font)(42, true);
+    ctx.fillText(card.dish, exports.JOURNAL_W / 2, 84);
+    ctx.fillStyle = theme_1.PALETTE.chili;
+    ctx.font = (0, theme_1.font)(16, false);
+    ctx.fillText(card.region, exports.JOURNAL_W / 2, 136);
+    (0, press_1.drawWoodWok)(ctx, 50, 160, exports.JOURNAL_W - 100, 420, 0.8, card.rating === 'wreck' ? 0.85 : 0.15, false);
+    (0, press_1.drawRoundSeal)(ctx, exports.JOURNAL_W - 110, 500, 58, (0, copy_1.ratingLabel)(card.rating));
+    ctx.fillStyle = theme_1.PALETTE.ink;
+    ctx.font = (0, theme_1.font)(28, true);
+    ctx.fillText(`${card.score} 分`, exports.JOURNAL_W / 2, 600);
+    ctx.font = (0, theme_1.font)(20, false);
+    ctx.textAlign = 'left';
+    (0, draw_1.drawWrapped)(ctx, card.quip, 64, 650, exports.JOURNAL_W - 128, 28);
+    (0, press_1.drawMenuRule)(ctx, 64, 720, exports.JOURNAL_W - 128);
+    ctx.fillStyle = theme_1.PALETTE.inkSoft;
+    ctx.font = (0, theme_1.font)(16, false);
+    (0, draw_1.drawWrapped)(ctx, card.science, 64, 736, exports.JOURNAL_W - 128, 26);
+    ctx.fillStyle = theme_1.PALETTE.chili;
+    ctx.font = (0, theme_1.font)(14, true);
+    ctx.textAlign = 'center';
+    ctx.fillText('今晚六桌', exports.JOURNAL_W / 2, 880);
+}
